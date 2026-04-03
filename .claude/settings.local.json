@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx hardhat:*)",
+      "Bash(node:*)",
+      "Bash(ORACLE_ADDRESS=0x24A400E17d2b9fd9C7eDd99f358A34Fe7751D849 npx hardhat:*)",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173)",
+      "Bash(kill %1)",
+      "Bash(sudo npm:*)"
+    ]
+  }
+}
