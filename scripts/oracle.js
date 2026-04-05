@@ -42,8 +42,12 @@ const claude   = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
  * Returns true if approved, false otherwise.
  */
 async function validateWithClaude(taskHash, sender, provider_, amount, deadline) {
-  const deadlineDate = new Date(Number(deadline) * 1000).toISOString();
-  const amountEth    = ethers.formatEther(amount);
+  const nowMs           = Date.now();
+  const deadlineMs      = Number(deadline) * 1000;
+  const deadlineDate    = new Date(deadlineMs).toISOString();
+  const nowDate         = new Date(nowMs).toISOString();
+  const deadlineInFuture = deadlineMs > nowMs;
+  const amountEth       = ethers.formatEther(amount);
 
   const prompt = `You are a validation oracle for a smart-contract escrow system on Base Mainnet.
 A new task has been submitted and requires your approval before funds are released.
@@ -55,9 +59,14 @@ Task details:
   amount   : ${amountEth} ETH (${amount.toString()} wei)
   deadline : ${deadlineDate}
 
+Pre-computed checks (performed by the oracle process — trust these values):
+  current time         : ${nowDate}
+  deadline in future?  : ${deadlineInFuture ? 'YES' : 'NO'}
+  amount > 0?          : ${BigInt(amount.toString()) > 0n ? 'YES' : 'NO'}
+
 Validation rules:
-1. The amount must be greater than 0.
-2. The deadline must be in the future (current time: ${new Date().toISOString()}).
+1. The amount must be greater than 0 — pre-computed above as "${BigInt(amount.toString()) > 0n ? 'YES' : 'NO'}".
+2. The deadline must be in the future — pre-computed above as "${deadlineInFuture ? 'YES' : 'NO'}". Do NOT re-derive this from dates; use the pre-computed value.
 3. The sender and provider addresses must be distinct, non-zero addresses.
 4. The taskHash must be a valid 32-byte hex string (0x-prefixed, 66 chars).
 
