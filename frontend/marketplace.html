@@ -590,7 +590,7 @@ function renderTasks() {
     <div class="task-card">
       <div class="task-card-header">
         <div>
-          <div class="task-title">${t.hash.slice(0,10)}...${t.hash.slice(-6)}</div>
+          <div class="task-title" style="cursor:pointer" onclick="navigator.clipboard.writeText('${t.hash}');this.style.color='var(--cyan)';setTimeout(()=>this.style.color='',1000)" title="Click to copy full hash">${t.hash.slice(0,10)}...${t.hash.slice(-6)} 📋</div>
           <span class="task-status ${t.status}">${t.status.toUpperCase()}</span>
         </div>
         <div style="text-align:right">
@@ -647,7 +647,7 @@ function loadMyTasks() {
     <div class="task-card">
       <div class="task-card-header">
         <div>
-          <div class="task-title">${t.hash.slice(0,10)}...${t.hash.slice(-6)}</div>
+          <div class="task-title" style="cursor:pointer" onclick="navigator.clipboard.writeText('${t.hash}');this.style.color='var(--cyan)';setTimeout(()=>this.style.color='',1000)" title="Click to copy full hash">${t.hash.slice(0,10)}...${t.hash.slice(-6)} 📋</div>
           <span class="task-status ${t.status}">${t.status.toUpperCase()}</span>
         </div>
         <div style="text-align:right">
