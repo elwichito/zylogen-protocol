@@ -542,7 +542,7 @@ async function loadEvents(readContract, readProvider) {
       status: releasedHashes.has(e.args.taskHash) ? 'settled' : reclaimedHashes.has(e.args.taskHash) ? 'reclaimed' : 'open'
     }));
 
-    renderTasks();
+    fetchApiTasks().then(() => renderTasks());
 
     // Build feed
     const allEvents = [];
@@ -558,7 +558,7 @@ async function loadEvents(readContract, readProvider) {
       const task = { hash: taskHash, sender, provider: prov, amount, deadline: Number(deadline), block: event.log?.blockNumber || 0, status: 'open' };
       allTasks.unshift(task);
       feedItems.unshift({ type: 'lock', hash: taskHash, sender, provider: prov, amount, block: task.block });
-      renderTasks();
+      fetchApiTasks().then(() => renderTasks());
       renderFeed();
       document.getElementById('statTasks').textContent = allTasks.length;
     });
@@ -567,7 +567,7 @@ async function loadEvents(readContract, readProvider) {
       const t = allTasks.find(t => t.hash === taskHash);
       if (t) t.status = 'settled';
       feedItems.unshift({ type: 'release', hash: taskHash, provider: prov, amount: provAmount, fee, block: event.log?.blockNumber || 0 });
-      renderTasks();
+      fetchApiTasks().then(() => renderTasks());
       renderFeed();
       document.getElementById('statSettled').textContent = allTasks.filter(t => t.status === 'settled').length;
     });
@@ -575,6 +575,16 @@ async function loadEvents(readContract, readProvider) {
   } catch(e) {
     console.error('Error loading events:', e);
   }
+}
+
+// Fetch titles from API
+let apiTasks = new Map();
+async function fetchApiTasks() {
+  try {
+    const res = await fetch(ORACLE_API + "/api/tasks");
+    const list = await res.json();
+    list.forEach(t => apiTasks.set(t.taskHash, t));
+  } catch(e) {}
 }
 
 function renderTasks() {
@@ -590,7 +600,7 @@ function renderTasks() {
     <div class="task-card">
       <div class="task-card-header">
         <div>
-          <div class="task-title" style="cursor:pointer" onclick="navigator.clipboard.writeText('${t.hash}');this.style.color='var(--cyan)';setTimeout(()=>this.style.color='',1000)" title="Click to copy full hash">${t.hash.slice(0,10)}...${t.hash.slice(-6)} 📋</div>
+          <div class="task-title" style="cursor:pointer" onclick="navigator.clipboard.writeText('${t.hash}');this.style.color='var(--cyan)';setTimeout(()=>this.style.color='',1000)" title="Click to copy full hash">${apiTasks.has(t.hash) ? apiTasks.get(t.hash).title : t.hash.slice(0,10)+'...'+t.hash.slice(-6)} 📋</div>
           <span class="task-status ${t.status}">${t.status.toUpperCase()}</span>
         </div>
         <div style="text-align:right">
@@ -647,7 +657,7 @@ function loadMyTasks() {
     <div class="task-card">
       <div class="task-card-header">
         <div>
-          <div class="task-title" style="cursor:pointer" onclick="navigator.clipboard.writeText('${t.hash}');this.style.color='var(--cyan)';setTimeout(()=>this.style.color='',1000)" title="Click to copy full hash">${t.hash.slice(0,10)}...${t.hash.slice(-6)} 📋</div>
+          <div class="task-title" style="cursor:pointer" onclick="navigator.clipboard.writeText('${t.hash}');this.style.color='var(--cyan)';setTimeout(()=>this.style.color='',1000)" title="Click to copy full hash">${apiTasks.has(t.hash) ? apiTasks.get(t.hash).title : t.hash.slice(0,10)+'...'+t.hash.slice(-6)} 📋</div>
           <span class="task-status ${t.status}">${t.status.toUpperCase()}</span>
         </div>
         <div style="text-align:right">
