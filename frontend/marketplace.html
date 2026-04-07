@@ -163,6 +163,7 @@ nav{position:fixed;top:0;width:100%;z-index:100;background:rgba(10,10,10,0.95);b
     <div class="tab" onclick="switchTab('browse')">OPEN TASKS</div>
     <div class="tab" onclick="switchTab('feed')">LIVE FEED</div>
     <div class="tab" onclick="switchTab('my')">MY TASKS</div>
+    <div class="tab" onclick="switchTab('submit')">SUBMIT WORK</div>
   </div>
 
   <!-- POST TASK -->
@@ -231,11 +232,35 @@ nav{position:fixed;top:0;width:100%;z-index:100;background:rgba(10,10,10,0.95);b
       </div>
     </div>
   </div>
+
+  <!-- SUBMIT WORK -->
+  <div class="tab-content" id="tab-submit">
+    <div class="form-card">
+      <div class="form-group">
+        <label class="form-label">TASK HASH</label>
+        <input class="form-input" id="submitHash" placeholder="0x... (paste the task hash you want to deliver)">
+        <div class="form-hint">GET THIS FROM THE OPEN TASKS TAB OR FROM THE CLIENT</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">CHECK TASK DETAILS</label>
+        <button class="btn-accept" onclick="checkTask()" style="margin:0">LOAD TASK</button>
+        <div id="taskDetails" style="margin-top:12px;padding:16px;background:var(--bg);border:1px solid var(--border);display:none;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim)"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">YOUR DELIVERABLE</label>
+        <textarea class="form-textarea" id="submitContent" placeholder="Paste your completed work here. The AI oracle will evaluate if this matches the task requirements..." style="min-height:200px"></textarea>
+        <div class="form-hint">THE AI ORACLE WILL READ THIS AND DECIDE IF IT MEETS THE TASK REQUIREMENTS</div>
+      </div>
+      <button class="btn-submit" id="submitWorkBtn" onclick="submitWork()">SUBMIT WORK FOR AI EVALUATION</button>
+      <div class="tx-status" id="submitStatus"></div>
+    </div>
+  </div>
 </div>
 
 <script>
 // CONFIG
 const CONTRACT = '0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f';
+const ORACLE_API = 'https://zylogen-protocol-production.up.railway.app';
 const RPC = 'https://mainnet.base.org';
 const CHAIN_ID = '0x2105';
 const ABI = [
@@ -302,7 +327,7 @@ async function connectWallet() {
 // TABS
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach((t,i) => {
-    const tabs = ['post','browse','feed','my'];
+    const tabs = ['post','browse','feed','my','submit'];
     t.classList.toggle('active', tabs[i] === name);
   });
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -353,7 +378,18 @@ async function postTask() {
     showStatus('pending', 'TX SUBMITTED: ' + tx.hash.slice(0,18) + '... WAITING FOR CONFIRMATION');
 
     const receipt = await tx.wait();
-    showStatus('success', 'TASK CREATED IN BLOCK ' + receipt.blockNumber + ' — ORACLE WILL VALIDATE WITHIN 60s');
+    showStatus('pending', 'ON-CHAIN CONFIRMED — REGISTERING WITH ORACLE...');
+
+    // Register task description with oracle API
+    try {
+      await fetch(ORACLE_API + '/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskHash, title, description: desc, sender: userAddress, provider: providerAddr })
+      });
+    } catch(e) { console.warn('API registration failed:', e); }
+
+    showStatus('success', 'TASK CREATED IN BLOCK ' + receipt.blockNumber + ' — WAITING FOR WORKER SUBMISSION');
 
     document.getElementById('taskTitle').value = '';
     document.getElementById('taskDesc').value = '';
@@ -373,6 +409,98 @@ function showStatus(type, msg) {
   el.className = 'tx-status ' + type;
   el.textContent = msg;
   el.style.display = 'block';
+}
+
+// CHECK TASK FROM API
+async function checkTask() {
+  const hash = document.getElementById('submitHash').value.trim();
+  if (!hash) return;
+  const details = document.getElementById('taskDetails');
+  details.style.display = 'block';
+  details.innerHTML = 'LOADING...';
+  try {
+    const res = await fetch(ORACLE_API + '/api/tasks/' + hash);
+    if (!res.ok) {
+      details.innerHTML = '<span style="color:var(--orange)">TASK NOT FOUND IN ORACLE. It may have been created directly on-chain.</span>';
+      return;
+    }
+    const task = await res.json();
+    details.innerHTML = `
+      <div style="margin-bottom:8px"><span style="color:var(--green)">TITLE:</span> ${task.title}</div>
+      <div style="margin-bottom:8px"><span style="color:var(--green)">DESCRIPTION:</span> ${task.description}</div>
+      <div style="margin-bottom:8px"><span style="color:var(--green)">BUDGET:</span> ${task.amount || 'pending'} ETH</div>
+      <div style="margin-bottom:8px"><span style="color:var(--green)">STATUS:</span> <span style="color:${task.status==='open'?'var(--green)':task.status==='released'?'var(--cyan)':'var(--orange)'}">${task.status.toUpperCase()}</span></div>
+      ${task.evaluation ? '<div><span style="color:var(--green)">EVALUATION:</span> ' + task.evaluation.reason + '</div>' : ''}
+    `;
+  } catch(e) {
+    details.innerHTML = '<span style="color:var(--red)">ERROR CONNECTING TO ORACLE API</span>';
+  }
+}
+
+// SUBMIT WORK
+async function submitWork() {
+  const hash = document.getElementById('submitHash').value.trim();
+  const content = document.getElementById('submitContent').value.trim();
+  const statusEl = document.getElementById('submitStatus');
+
+  if (!hash || !content) {
+    statusEl.className = 'tx-status error';
+    statusEl.textContent = 'TASK HASH AND DELIVERABLE REQUIRED';
+    statusEl.style.display = 'block';
+    return;
+  }
+
+  statusEl.className = 'tx-status pending';
+  statusEl.textContent = 'SUBMITTING WORK TO AI ORACLE FOR EVALUATION...';
+  statusEl.style.display = 'block';
+  document.getElementById('submitWorkBtn').disabled = true;
+
+  try {
+    const res = await fetch(ORACLE_API + '/api/tasks/' + hash + '/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, workerAddress: userAddress || 'unknown' })
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      statusEl.className = 'tx-status pending';
+      statusEl.textContent = 'WORK SUBMITTED — AI ORACLE IS EVALUATING... CHECK BACK IN 30 SECONDS';
+
+      // Poll for result
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        try {
+          const check = await fetch(ORACLE_API + '/api/tasks/' + hash);
+          const task = await check.json();
+          if (task.status === 'released') {
+            clearInterval(poll);
+            statusEl.className = 'tx-status success';
+            statusEl.textContent = 'APPROVED — FUNDS RELEASED TO WORKER. ' + (task.evaluation?.reason || '');
+            document.getElementById('submitWorkBtn').disabled = false;
+          } else if (task.status === 'rejected') {
+            clearInterval(poll);
+            statusEl.className = 'tx-status error';
+            statusEl.textContent = 'REJECTED — ' + (task.evaluation?.reason || 'Work did not meet requirements');
+            document.getElementById('submitWorkBtn').disabled = false;
+          } else if (attempts > 20) {
+            clearInterval(poll);
+            statusEl.textContent = 'STILL EVALUATING... REFRESH PAGE TO CHECK STATUS';
+            document.getElementById('submitWorkBtn').disabled = false;
+          }
+        } catch(e) {}
+      }, 3000);
+    } else {
+      statusEl.className = 'tx-status error';
+      statusEl.textContent = 'ERROR: ' + (data.error || 'Unknown error').toUpperCase();
+      document.getElementById('submitWorkBtn').disabled = false;
+    }
+  } catch(e) {
+    statusEl.className = 'tx-status error';
+    statusEl.textContent = 'FAILED TO CONNECT TO ORACLE API';
+    document.getElementById('submitWorkBtn').disabled = false;
+  }
 }
 
 // LOAD EVENTS FROM CHAIN
