@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zylogen Protocol — Marketplace</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0a;--bg2:#0d1117;--green:#00ff88;--green2:#00cc6a;--green-dim:#00ff8822;--cyan:#00e5ff;--border:#1a2a1a;--text:#c0c0c0;--text-dim:#606060;--card-bg:#0d1a12;--orange:#ff6b00;--red:#ff4444;--purple:#a855f7}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;line-height:1.6;min-height:100vh}
+body::after{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,0.012) 2px,rgba(0,255,136,0.012) 4px);pointer-events:none;z-index:9999}
+.grid-bg{position:fixed;top:0;left:0;width:100%;height:100%;background-image:linear-gradient(rgba(0,255,136,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,0.02) 1px,transparent 1px);background-size:60px 60px;z-index:0;pointer-events:none}
+
+/* NAV */
+nav{position:fixed;top:0;width:100%;z-index:100;background:rgba(10,10,10,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 40px;height:56px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{font-family:'Orbitron',sans-serif;font-weight:900;font-size:14px;letter-spacing:4px;color:var(--green);text-decoration:none}
+.nav-logo span{color:var(--cyan)}
+.nav-links{display:flex;gap:24px;align-items:center}
+.nav-links a{color:var(--text-dim);text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;transition:color .3s}
+.nav-links a:hover,.nav-links a.active{color:var(--green)}
+.nav-right{display:flex;align-items:center;gap:16px}
+.nav-status{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--green);display:flex;align-items:center;gap:6px}
+.nav-status::before{content:'';width:6px;height:6px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.btn-connect{background:transparent;border:1px solid var(--green);color:var(--green);padding:8px 20px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;transition:all .3s}
+.btn-connect:hover{background:var(--green);color:var(--bg)}
+.wallet-addr{display:none;padding:8px 16px;border:1px solid var(--green);font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--green);align-items:center;gap:6px}
+.wallet-addr::before{content:'';width:6px;height:6px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}
+
+/* MAIN LAYOUT */
+.main{padding:80px 40px 40px;position:relative;z-index:1;max-width:1400px;margin:0 auto}
+.page-header{margin-bottom:40px}
+.page-tag{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:4px;color:var(--cyan);opacity:.7}
+.page-tag::before{content:'// '}
+.page-title{font-family:'Orbitron',sans-serif;font-size:36px;font-weight:700;color:#fff;letter-spacing:2px;margin-top:8px}
+
+/* TABS */
+.tabs{display:flex;gap:2px;margin-bottom:32px;background:var(--border)}
+.tab{flex:1;padding:14px 24px;background:var(--bg2);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--text-dim);text-align:center;cursor:pointer;transition:all .3s;border-top:2px solid transparent}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--green);border-top-color:var(--green);background:var(--card-bg)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* POST TASK FORM */
+.form-card{background:var(--card-bg);border:1px solid var(--border);padding:40px;max-width:700px}
+.form-group{margin-bottom:24px}
+.form-label{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:8px;display:block}
+.form-input,.form-textarea,.form-select{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:12px 16px;font-family:'Share Tech Mono',monospace;font-size:13px;outline:none;transition:border-color .3s}
+.form-input:focus,.form-textarea:focus{border-color:var(--green)}
+.form-textarea{min-height:100px;resize:vertical}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.form-hint{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text-dim);margin-top:4px}
+.btn-submit{background:var(--green);color:var(--bg);border:none;padding:14px 40px;font-family:'Share Tech Mono',monospace;font-size:13px;letter-spacing:3px;font-weight:700;cursor:pointer;transition:all .3s;width:100%}
+.btn-submit:hover{box-shadow:0 0 30px rgba(0,255,136,.4);transform:translateY(-1px)}
+.btn-submit:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+.fee-breakdown{background:var(--bg);border:1px solid var(--border);padding:16px;margin-bottom:24px;font-family:'Share Tech Mono',monospace;font-size:11px}
+.fee-row{display:flex;justify-content:space-between;padding:4px 0;color:var(--text-dim)}
+.fee-row.total{color:var(--green);border-top:1px solid var(--border);padding-top:8px;margin-top:8px}
+
+/* TASK CARDS */
+.tasks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:2px;background:var(--border)}
+.task-card{background:var(--card-bg);padding:28px;transition:all .4s;position:relative;overflow:hidden}
+.task-card:hover{background:#0f2218}
+.task-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+.task-title{font-family:'Orbitron',sans-serif;font-size:14px;color:#fff;letter-spacing:1px}
+.task-amount{font-family:'Orbitron',sans-serif;font-size:18px;color:var(--green);font-weight:700}
+.task-amount-label{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text-dim);letter-spacing:1px}
+.task-desc{font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:16px;font-weight:300}
+.task-meta{display:flex;gap:16px;flex-wrap:wrap}
+.task-meta-item{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text-dim);letter-spacing:1px}
+.task-meta-item span{color:var(--text)}
+.task-status{display:inline-block;padding:3px 10px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px}
+.task-status.open{border:1px solid var(--green);color:var(--green)}
+.task-status.settled{border:1px solid var(--cyan);color:var(--cyan)}
+.task-status.reclaimed{border:1px solid var(--orange);color:var(--orange)}
+.btn-accept{background:transparent;border:1px solid var(--green);color:var(--green);padding:8px 20px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;cursor:pointer;transition:all .3s;margin-top:16px}
+.btn-accept:hover{background:var(--green);color:var(--bg)}
+
+/* LIVE FEED */
+.feed-list{display:flex;flex-direction:column;gap:2px}
+.feed-item{background:var(--card-bg);padding:16px 24px;display:flex;align-items:center;gap:16px;border-left:3px solid var(--green);font-family:'Share Tech Mono',monospace;font-size:11px}
+.feed-item.release{border-left-color:var(--green)}
+.feed-item.lock{border-left-color:var(--cyan)}
+.feed-item.reclaim{border-left-color:var(--orange)}
+.feed-type{font-size:9px;letter-spacing:2px;padding:3px 8px;min-width:70px;text-align:center}
+.feed-type.release{border:1px solid var(--green);color:var(--green)}
+.feed-type.lock{border:1px solid var(--cyan);color:var(--cyan)}
+.feed-type.reclaim{border:1px solid var(--orange);color:var(--orange)}
+.feed-details{flex:1;color:var(--text-dim)}
+.feed-details a{color:var(--cyan);text-decoration:none}
+.feed-amount{color:var(--green);font-weight:700}
+.feed-time{color:var(--text-dim);font-size:10px;min-width:80px;text-align:right}
+
+/* STATS BAR */
+.stats-bar{display:flex;gap:2px;background:var(--border);margin-bottom:32px}
+.stat-box{flex:1;background:var(--card-bg);padding:20px 24px;text-align:center}
+.stat-val{font-family:'Orbitron',sans-serif;font-size:22px;font-weight:700;color:var(--green)}
+.stat-lbl{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--text-dim);margin-top:4px}
+
+/* EMPTY STATE */
+.empty-state{text-align:center;padding:80px 40px;background:var(--card-bg);border:1px solid var(--border)}
+.empty-icon{font-size:48px;margin-bottom:16px;opacity:.5}
+.empty-title{font-family:'Orbitron',sans-serif;font-size:16px;color:var(--text-dim);letter-spacing:2px;margin-bottom:8px}
+.empty-desc{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim)}
+
+/* TX STATUS */
+.tx-status{margin-top:16px;padding:16px;font-family:'Share Tech Mono',monospace;font-size:11px;display:none}
+.tx-status.pending{background:rgba(0,229,255,.1);border:1px solid var(--cyan);color:var(--cyan)}
+.tx-status.success{background:rgba(0,255,136,.1);border:1px solid var(--green);color:var(--green)}
+.tx-status.error{background:rgba(255,68,68,.1);border:1px solid var(--red);color:var(--red)}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .main{padding:70px 16px 16px}
+  nav{padding:0 16px}
+  .nav-links{display:none}
+  .form-row{grid-template-columns:1fr}
+  .tasks-grid{grid-template-columns:1fr}
+  .stats-bar{flex-direction:column}
+  .tabs{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<nav>
+  <a href="/" class="nav-logo">ZYLOGEN<span>.PROTOCOL</span></a>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="#" class="active">Marketplace</a>
+    <a href="/#whitepaper">Whitepaper</a>
+    <a href="/#roadmap">Roadmap</a>
+    <a href="/#community">Community</a>
+  </div>
+  <div class="nav-right">
+    <div class="nav-status">BASE MAINNET</div>
+    <button class="btn-connect" id="connectBtn" onclick="connectWallet()">CONNECT WALLET</button>
+    <div class="wallet-addr" id="walletAddr"></div>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="page-header">
+    <div class="page-tag">MARKETPLACE</div>
+    <div class="page-title">HIRE. GET HIRED. SETTLE.</div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-bar">
+    <div class="stat-box"><div class="stat-val" id="statTasks">—</div><div class="stat-lbl">TASKS CREATED</div></div>
+    <div class="stat-box"><div class="stat-val" id="statSettled">—</div><div class="stat-lbl">TASKS SETTLED</div></div>
+    <div class="stat-box"><div class="stat-val" id="statVolume">—</div><div class="stat-lbl">ETH VOLUME</div></div>
+    <div class="stat-box"><div class="stat-val" id="statFees">—</div><div class="stat-lbl">FEES EARNED</div></div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('post')">+ POST TASK</div>
+    <div class="tab" onclick="switchTab('browse')">OPEN TASKS</div>
+    <div class="tab" onclick="switchTab('feed')">LIVE FEED</div>
+    <div class="tab" onclick="switchTab('my')">MY TASKS</div>
+  </div>
+
+  <!-- POST TASK -->
+  <div class="tab-content active" id="tab-post">
+    <div class="form-card">
+      <div class="form-group">
+        <label class="form-label">TASK TITLE</label>
+        <input class="form-input" id="taskTitle" placeholder="e.g. Write a blog post about AI agents">
+      </div>
+      <div class="form-group">
+        <label class="form-label">TASK DESCRIPTION</label>
+        <textarea class="form-textarea" id="taskDesc" placeholder="Describe the deliverables, requirements, and acceptance criteria..."></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">BUDGET (ETH)</label>
+          <input class="form-input" id="taskBudget" type="number" step="0.0001" min="0.0001" placeholder="0.01" oninput="updateFees()">
+          <div class="form-hint">MIN: 0.0001 ETH</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">PROVIDER WALLET ADDRESS</label>
+          <input class="form-input" id="taskProvider" placeholder="0x...">
+          <div class="form-hint">WHO WILL DO THE WORK</div>
+        </div>
+      </div>
+      <div class="fee-breakdown" id="feeBreakdown">
+        <div class="fee-row"><span>BUDGET</span><span id="feeBudget">0 ETH</span></div>
+        <div class="fee-row"><span>WORKER RECEIVES (99%)</span><span id="feeWorker">0 ETH</span></div>
+        <div class="fee-row"><span>PROTOCOL FEE (1%)</span><span id="feePlatform">0 ETH</span></div>
+        <div class="fee-row total"><span>YOU PAY (LOCKED IN ESCROW)</span><span id="feeTotal">0 ETH</span></div>
+      </div>
+      <button class="btn-submit" id="submitBtn" onclick="postTask()" disabled>CONNECT WALLET TO POST</button>
+      <div class="tx-status" id="txStatus"></div>
+    </div>
+  </div>
+
+  <!-- BROWSE TASKS -->
+  <div class="tab-content" id="tab-browse">
+    <div class="tasks-grid" id="tasksList">
+      <div class="empty-state">
+        <div class="empty-icon">⬡</div>
+        <div class="empty-title">SCANNING BLOCKCHAIN...</div>
+        <div class="empty-desc">LOADING TASKS FROM BASE MAINNET</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIVE FEED -->
+  <div class="tab-content" id="tab-feed">
+    <div class="feed-list" id="feedList">
+      <div class="empty-state">
+        <div class="empty-icon">◉</div>
+        <div class="empty-title">LISTENING FOR EVENTS...</div>
+        <div class="empty-desc">REAL-TIME ON-CHAIN ACTIVITY WILL APPEAR HERE</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MY TASKS -->
+  <div class="tab-content" id="tab-my">
+    <div class="tasks-grid" id="myTasksList">
+      <div class="empty-state">
+        <div class="empty-icon">👤</div>
+        <div class="empty-title">CONNECT WALLET</div>
+        <div class="empty-desc">CONNECT YOUR WALLET TO SEE YOUR TASKS</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// CONFIG
+const CONTRACT = '0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f';
+const RPC = 'https://mainnet.base.org';
+const CHAIN_ID = '0x2105';
+const ABI = [
+  'function lock(bytes32 taskHash, address provider) external payable',
+  'function escrows(bytes32) view returns (address sender, uint96 amount, address provider, uint40 deadline)',
+  'function reclaim(bytes32 taskHash)',
+  'event TaskCreated(bytes32 indexed taskHash, address indexed sender, address indexed provider, uint96 amount, uint40 deadline)',
+  'event TaskReleased(bytes32 indexed taskHash, address indexed provider, uint96 providerAmount, uint96 fee)',
+  'event TaskReclaimed(bytes32 indexed taskHash, address indexed sender, uint96 amount)'
+];
+
+let userAddress = null;
+let provider = null;
+let signer = null;
+let contract = null;
+let allTasks = [];
+let feedItems = [];
+
+// ETHERS FROM CDN
+const ethersScript = document.createElement('script');
+ethersScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/ethers/6.9.0/ethers.umd.min.js';
+ethersScript.onload = () => { initReadOnly(); };
+document.head.appendChild(ethersScript);
+
+function initReadOnly() {
+  const readProvider = new ethers.JsonRpcProvider(RPC);
+  const readContract = new ethers.Contract(CONTRACT, ABI, readProvider);
+  loadEvents(readContract, readProvider);
+}
+
+// WALLET CONNECTION
+async function connectWallet() {
+  if (typeof window.ethereum === 'undefined') {
+    window.open('https://metamask.io/download/', '_blank');
+    return;
+  }
+  try {
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    userAddress = accounts[0];
+    try {
+      await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: CHAIN_ID }] });
+    } catch(e) {
+      if (e.code === 4902) {
+        await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: CHAIN_ID, chainName: 'Base', nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: ['https://mainnet.base.org'], blockExplorerUrls: ['https://basescan.org'] }] });
+      }
+    }
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer = await provider.getSigner();
+    contract = new ethers.Contract(CONTRACT, ABI, signer);
+
+    const short = userAddress.slice(0,6) + '...' + userAddress.slice(-4);
+    document.getElementById('connectBtn').style.display = 'none';
+    const wa = document.getElementById('walletAddr');
+    wa.style.display = 'flex';
+    wa.textContent = short;
+
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('submitBtn').textContent = 'POST TASK — LOCK ETH IN ESCROW';
+
+    loadMyTasks();
+  } catch(e) { console.error(e); }
+}
+
+// TABS
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const tabs = ['post','browse','feed','my'];
+    t.classList.toggle('active', tabs[i] === name);
+  });
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// FEE CALCULATOR
+function updateFees() {
+  const budget = parseFloat(document.getElementById('taskBudget').value) || 0;
+  const worker = budget * 0.99;
+  const fee = budget * 0.01;
+  document.getElementById('feeBudget').textContent = budget.toFixed(6) + ' ETH';
+  document.getElementById('feeWorker').textContent = worker.toFixed(6) + ' ETH';
+  document.getElementById('feePlatform').textContent = fee.toFixed(6) + ' ETH';
+  document.getElementById('feeTotal').textContent = budget.toFixed(6) + ' ETH';
+}
+
+// POST TASK
+async function postTask() {
+  const title = document.getElementById('taskTitle').value.trim();
+  const desc = document.getElementById('taskDesc').value.trim();
+  const budget = document.getElementById('taskBudget').value;
+  const providerAddr = document.getElementById('taskProvider').value.trim();
+  const status = document.getElementById('txStatus');
+
+  if (!title || !desc || !budget || !providerAddr) {
+    showStatus('error', 'ALL FIELDS REQUIRED');
+    return;
+  }
+  if (!ethers.isAddress(providerAddr)) {
+    showStatus('error', 'INVALID PROVIDER ADDRESS');
+    return;
+  }
+  if (parseFloat(budget) <= 0) {
+    showStatus('error', 'BUDGET MUST BE > 0');
+    return;
+  }
+
+  const taskData = title + '|' + desc + '|' + Date.now();
+  const taskHash = ethers.keccak256(ethers.toUtf8Bytes(taskData));
+  const amount = ethers.parseEther(budget);
+
+  try {
+    showStatus('pending', 'SUBMITTING TRANSACTION...');
+    document.getElementById('submitBtn').disabled = true;
+
+    const tx = await contract.lock(taskHash, providerAddr, { value: amount });
+    showStatus('pending', 'TX SUBMITTED: ' + tx.hash.slice(0,18) + '... WAITING FOR CONFIRMATION');
+
+    const receipt = await tx.wait();
+    showStatus('success', 'TASK CREATED IN BLOCK ' + receipt.blockNumber + ' — ORACLE WILL VALIDATE WITHIN 60s');
+
+    document.getElementById('taskTitle').value = '';
+    document.getElementById('taskDesc').value = '';
+    document.getElementById('taskBudget').value = '';
+    document.getElementById('taskProvider').value = '';
+    updateFees();
+
+    setTimeout(() => { document.getElementById('submitBtn').disabled = false; }, 3000);
+  } catch(e) {
+    showStatus('error', 'FAILED: ' + (e.reason || e.message).toUpperCase().slice(0,100));
+    document.getElementById('submitBtn').disabled = false;
+  }
+}
+
+function showStatus(type, msg) {
+  const el = document.getElementById('txStatus');
+  el.className = 'tx-status ' + type;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+// LOAD EVENTS FROM CHAIN
+async function loadEvents(readContract, readProvider) {
+  try {
+    const currentBlock = await readProvider.getBlockNumber();
+    const fromBlock = Math.max(0, currentBlock - 50000);
+
+    const [created, released, reclaimed] = await Promise.all([
+      readContract.queryFilter('TaskCreated', fromBlock),
+      readContract.queryFilter('TaskReleased', fromBlock),
+      readContract.queryFilter('TaskReclaimed', fromBlock)
+    ]);
+
+    const releasedHashes = new Set(released.map(e => e.args[0]));
+    const reclaimedHashes = new Set(reclaimed.map(e => e.args[0]));
+
+    // Stats
+    const totalCreated = created.length;
+    const totalSettled = released.length;
+    let totalVolume = 0n;
+    let totalFees = 0n;
+    created.forEach(e => totalVolume += BigInt(e.args.amount));
+    released.forEach(e => totalFees += BigInt(e.args.fee));
+
+    document.getElementById('statTasks').textContent = totalCreated;
+    document.getElementById('statSettled').textContent = totalSettled;
+    document.getElementById('statVolume').textContent = parseFloat(ethers.formatEther(totalVolume)).toFixed(4);
+    document.getElementById('statFees').textContent = parseFloat(ethers.formatEther(totalFees)).toFixed(6);
+
+    // Build task list
+    allTasks = created.map(e => ({
+      hash: e.args.taskHash,
+      sender: e.args.sender,
+      provider: e.args.provider,
+      amount: e.args.amount,
+      deadline: Number(e.args.deadline),
+      block: e.blockNumber,
+      status: releasedHashes.has(e.args.taskHash) ? 'settled' : reclaimedHashes.has(e.args.taskHash) ? 'reclaimed' : 'open'
+    }));
+
+    renderTasks();
+
+    // Build feed
+    const allEvents = [];
+    created.forEach(e => allEvents.push({ type: 'lock', hash: e.args.taskHash, sender: e.args.sender, provider: e.args.provider, amount: e.args.amount, block: e.blockNumber }));
+    released.forEach(e => allEvents.push({ type: 'release', hash: e.args.taskHash, provider: e.args.provider, amount: e.args.providerAmount, fee: e.args.fee, block: e.blockNumber }));
+    reclaimed.forEach(e => allEvents.push({ type: 'reclaim', hash: e.args.taskHash, sender: e.args.sender, amount: e.args.amount, block: e.blockNumber }));
+    allEvents.sort((a,b) => b.block - a.block);
+    feedItems = allEvents;
+    renderFeed();
+
+    // Listen for new events
+    readContract.on('TaskCreated', (taskHash, sender, prov, amount, deadline, event) => {
+      const task = { hash: taskHash, sender, provider: prov, amount, deadline: Number(deadline), block: event.log?.blockNumber || 0, status: 'open' };
+      allTasks.unshift(task);
+      feedItems.unshift({ type: 'lock', hash: taskHash, sender, provider: prov, amount, block: task.block });
+      renderTasks();
+      renderFeed();
+      document.getElementById('statTasks').textContent = allTasks.length;
+    });
+
+    readContract.on('TaskReleased', (taskHash, prov, provAmount, fee, event) => {
+      const t = allTasks.find(t => t.hash === taskHash);
+      if (t) t.status = 'settled';
+      feedItems.unshift({ type: 'release', hash: taskHash, provider: prov, amount: provAmount, fee, block: event.log?.blockNumber || 0 });
+      renderTasks();
+      renderFeed();
+      document.getElementById('statSettled').textContent = allTasks.filter(t => t.status === 'settled').length;
+    });
+
+  } catch(e) {
+    console.error('Error loading events:', e);
+  }
+}
+
+function renderTasks() {
+  const container = document.getElementById('tasksList');
+  const openTasks = allTasks.filter(t => t.status === 'open');
+
+  if (allTasks.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">⬡</div><div class="empty-title">NO TASKS YET</div><div class="empty-desc">BE THE FIRST TO POST A TASK</div></div>';
+    return;
+  }
+
+  container.innerHTML = allTasks.slice(0, 20).map(t => `
+    <div class="task-card">
+      <div class="task-card-header">
+        <div>
+          <div class="task-title">${t.hash.slice(0,10)}...${t.hash.slice(-6)}</div>
+          <span class="task-status ${t.status}">${t.status.toUpperCase()}</span>
+        </div>
+        <div style="text-align:right">
+          <div class="task-amount">${parseFloat(ethers.formatEther(t.amount)).toFixed(4)}</div>
+          <div class="task-amount-label">ETH LOCKED</div>
+        </div>
+      </div>
+      <div class="task-meta">
+        <div class="task-meta-item">SENDER <span>${t.sender.slice(0,6)}...${t.sender.slice(-4)}</span></div>
+        <div class="task-meta-item">WORKER <span>${t.provider.slice(0,6)}...${t.provider.slice(-4)}</span></div>
+        <div class="task-meta-item">DEADLINE <span>${new Date(t.deadline * 1000).toLocaleDateString()}</span></div>
+        <div class="task-meta-item">BLOCK <span>${t.block}</span></div>
+      </div>
+      ${t.status === 'open' ? '<button class="btn-accept" onclick="window.open(\'https://basescan.org/address/' + CONTRACT + '\',\'_blank\')">VIEW ON BASESCAN</button>' : ''}
+    </div>
+  `).join('');
+}
+
+function renderFeed() {
+  const container = document.getElementById('feedList');
+  if (feedItems.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">◉</div><div class="empty-title">NO ACTIVITY YET</div><div class="empty-desc">ON-CHAIN EVENTS WILL APPEAR HERE IN REAL TIME</div></div>';
+    return;
+  }
+
+  container.innerHTML = feedItems.slice(0, 30).map(f => {
+    const typeLabel = f.type === 'lock' ? 'LOCKED' : f.type === 'release' ? 'RELEASED' : 'RECLAIMED';
+    const addr = f.type === 'release' ? f.provider : f.sender || '';
+    return `
+      <div class="feed-item ${f.type}">
+        <span class="feed-type ${f.type}">${typeLabel}</span>
+        <div class="feed-details">
+          <a href="https://basescan.org/address/${addr}" target="_blank">${(addr||'').slice(0,8)}...${(addr||'').slice(-4)}</a>
+          — Task ${f.hash.slice(0,10)}...
+        </div>
+        <span class="feed-amount">${parseFloat(ethers.formatEther(f.amount)).toFixed(4)} ETH</span>
+        <span class="feed-time">Block ${f.block}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function loadMyTasks() {
+  if (!userAddress) return;
+  const myTasks = allTasks.filter(t => t.sender.toLowerCase() === userAddress.toLowerCase() || t.provider.toLowerCase() === userAddress.toLowerCase());
+  const container = document.getElementById('myTasksList');
+
+  if (myTasks.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">NO TASKS FOUND</div><div class="empty-desc">YOU HAVEN\'T POSTED OR ACCEPTED ANY TASKS YET</div></div>';
+    return;
+  }
+
+  container.innerHTML = myTasks.map(t => `
+    <div class="task-card">
+      <div class="task-card-header">
+        <div>
+          <div class="task-title">${t.hash.slice(0,10)}...${t.hash.slice(-6)}</div>
+          <span class="task-status ${t.status}">${t.status.toUpperCase()}</span>
+        </div>
+        <div style="text-align:right">
+          <div class="task-amount">${parseFloat(ethers.formatEther(t.amount)).toFixed(4)}</div>
+          <div class="task-amount-label">ETH</div>
+        </div>
+      </div>
+      <div class="task-meta">
+        <div class="task-meta-item">ROLE <span>${t.sender.toLowerCase() === userAddress.toLowerCase() ? 'CLIENT' : 'WORKER'}</span></div>
+        <div class="task-meta-item">DEADLINE <span>${new Date(t.deadline * 1000).toLocaleDateString()}</span></div>
+      </div>
+    </div>
+  `).join('');
+}
+</script>
+</body>
+</html>
