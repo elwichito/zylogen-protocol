@@ -269,7 +269,14 @@ async function handleTaskCreated(taskHash, sender, provider_, amount, deadline, 
       txHash: null,
       createdAt: new Date().toISOString()
     });
-    console.log(`[oracle] Unregistered task detected — stored as "Direct Contract Task"`);
+    console.log(`[oracle] Waiting 5s for possible API registration...`);
+    await new Promise(r => setTimeout(r, 5000));
+    const updatedTask = tasks.get(taskHash);
+    if (updatedTask && updatedTask.title !== "Direct Contract Task") {
+      console.log(`[oracle] Task registered via API — waiting for worker submission`);
+      return;
+    }
+    console.log(`[oracle] No API registration — treating as direct contract task`);
     
     // For direct contract tasks without descriptions, do basic validation and release
     const nowMs = Date.now();
