@@ -97,7 +97,7 @@ app.post('/api/tasks/:taskHash/submit', (req, res) => {
   if (!task) {
     return res.status(404).json({ error: 'Task not found. Post task description first.' });
   }
-  if (task.status !== 'open') {
+  if (task.status !== 'open' && task.status !== 'rejected') {
     return res.status(400).json({ error: `Task is ${task.status}, cannot submit` });
   }
 
