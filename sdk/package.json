@@ -1,0 +1,33 @@
+{
+  "name": "zylogen-sdk",
+  "version": "2.0.0",
+  "description": "JavaScript SDK for Zylogen Protocol — AI-validated escrow on Base L2",
+  "main": "index.js",
+  "keywords": [
+    "zylogen",
+    "escrow",
+    "base",
+    "ethereum",
+    "usdc",
+    "ai-agents",
+    "web3",
+    "smart-contract",
+    "defi"
+  ],
+  "author": "Zylogen Protocol",
+  "license": "MIT",
+  "homepage": "https://zylogen.xyz",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/elwichito/zylogen-protocol"
+  },
+  "peerDependencies": {
+    "ethers": "^6.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "zylogen-sdk": "^2.0.0"
+  }
+}

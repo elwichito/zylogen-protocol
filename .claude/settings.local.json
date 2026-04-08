@@ -9,7 +9,12 @@
       "Bash(npm run:*)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173)",
       "Bash(kill %1)",
-      "Bash(sudo npm:*)"
+      "Bash(sudo npm:*)",
+      "Bash(cat /Users/wich/zylogen-protocol/frontend/.env*)",
+      "Bash(vercel env:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git push:*)"
     ]
   }
 }

@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { useWeb3Modal, useWeb3ModalAccount, useWeb3ModalProvider } from '@web3modal/ethers/react'
 import { BrowserProvider, Contract, parseEther, isAddress, hexlify, toUtf8Bytes, zeroPadValue } from 'ethers'
 import './App.css'
 
@@ -23,66 +24,34 @@ function shortAddr(addr) {
 }
 
 function toBytes32(str) {
-  // If already a 0x hex string of correct length, use as-is
   if (/^0x[0-9a-fA-F]{64}$/.test(str)) return str
-  // Otherwise UTF-8 encode and left-pad
   const encoded = toUtf8Bytes(str)
   if (encoded.length > 32) throw new Error('taskHash too long (max 32 bytes as UTF-8)')
   return zeroPadValue(hexlify(encoded), 32)
 }
 
 export default function App() {
-  const [wallet, setWallet]     = useState(null)   // { address, provider, signer }
-  const [chainOk, setChainOk]   = useState(false)
+  const { open } = useWeb3Modal()
+  const { address, chainId, isConnected } = useWeb3ModalAccount()
+  const { walletProvider } = useWeb3ModalProvider()
 
-  const [taskHash, setTaskHash]     = useState('')
-  const [provider, setProvider]     = useState('')
-  const [amount, setAmount]         = useState('')
+  const chainOk = isConnected && Number(chainId) === BASE_CHAIN_ID
 
-  const [status, setStatus] = useState(null)  // { type: 'loading'|'success'|'error', msg }
-
-  const connectWallet = useCallback(async () => {
-    if (!window.ethereum) {
-      setStatus({ type: 'error', msg: 'MetaMask not detected. Please install it.' })
-      return
-    }
-    try {
-      const ethProvider = new BrowserProvider(window.ethereum)
-      await ethProvider.send('eth_requestAccounts', [])
-      const signer  = await ethProvider.getSigner()
-      const address = await signer.getAddress()
-      const network = await ethProvider.getNetwork()
-      const onBase  = Number(network.chainId) === BASE_CHAIN_ID
-
-      setWallet({ address, ethProvider, signer })
-      setChainOk(onBase)
-
-      if (!onBase) {
-        try {
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0x2105' }],
-          })
-          setChainOk(true)
-        } catch {
-          setStatus({ type: 'error', msg: 'Please switch MetaMask to Base Mainnet.' })
-        }
-      }
-    } catch (err) {
-      setStatus({ type: 'error', msg: err.message || 'Connection failed.' })
-    }
-  }, [])
+  const [taskHash, setTaskHash] = useState('')
+  const [provider, setProvider] = useState('')
+  const [amount, setAmount]     = useState('')
+  const [status, setStatus]     = useState(null)  // { type: 'loading'|'success'|'error', msg }
 
   const handleLock = useCallback(async (e) => {
     e.preventDefault()
     setStatus(null)
 
-    if (!wallet) {
+    if (!isConnected) {
       setStatus({ type: 'error', msg: 'Connect your wallet first.' })
       return
     }
     if (!chainOk) {
-      setStatus({ type: 'error', msg: 'Switch to Base Mainnet in MetaMask.' })
+      setStatus({ type: 'error', msg: 'Switch to Base Mainnet in your wallet.' })
       return
     }
     if (!isAddress(provider)) {
@@ -104,16 +73,14 @@ export default function App() {
         setStatus({ type: 'error', msg: err.message }); return
       }
 
-      setStatus({ type: 'loading', msg: 'Confirm the transaction in MetaMask…' })
-      const contract = new Contract(CONTRACT_ADDRESS, ABI, wallet.signer)
+      setStatus({ type: 'loading', msg: 'Confirm the transaction in your wallet…' })
+      const ethProvider = new BrowserProvider(walletProvider)
+      const signer = await ethProvider.getSigner()
+      const contract = new Contract(CONTRACT_ADDRESS, ABI, signer)
       const tx = await contract.lock(hash32, provider, { value: parseEther(amount) })
-      setStatus({ type: 'loading', msg: `Transaction submitted. Waiting for confirmation…` })
+      setStatus({ type: 'loading', msg: 'Transaction submitted. Waiting for confirmation…' })
       const receipt = await tx.wait()
-      setStatus({
-        type: 'success',
-        msg: `Task locked on-chain.`,
-        txHash: receipt.hash,
-      })
+      setStatus({ type: 'success', msg: 'Task locked on-chain.', txHash: receipt.hash })
       setTaskHash('')
       setProvider('')
       setAmount('')
@@ -121,7 +88,7 @@ export default function App() {
       const msg = err?.reason || err?.shortMessage || err?.message || 'Transaction failed.'
       setStatus({ type: 'error', msg })
     }
-  }, [wallet, chainOk, taskHash, provider, amount])
+  }, [isConnected, chainOk, taskHash, provider, amount, walletProvider])
 
   return (
     <>
@@ -133,13 +100,13 @@ export default function App() {
             <span className="logo-text">YLOGEN</span>
           </div>
           <div className="nav-right">
-            {wallet ? (
-              <div className="wallet-badge">
+            {isConnected ? (
+              <div className="wallet-badge" onClick={() => open()} style={{ cursor: 'pointer' }}>
                 <span className={`chain-dot ${chainOk ? 'ok' : 'warn'}`} />
-                <span className="wallet-addr">{shortAddr(wallet.address)}</span>
+                <span className="wallet-addr">{shortAddr(address)}</span>
               </div>
             ) : (
-              <button className="btn-connect" onClick={connectWallet}>
+              <button className="btn-connect" onClick={() => open()}>
                 Connect Wallet
               </button>
             )}
@@ -163,8 +130,8 @@ export default function App() {
               and pays — autonomously.
             </p>
             <div className="hero-actions">
-              {!wallet ? (
-                <button className="btn-primary" onClick={connectWallet}>
+              {!isConnected ? (
+                <button className="btn-primary" onClick={() => open()}>
                   Connect Wallet
                 </button>
               ) : (
@@ -238,18 +205,18 @@ export default function App() {
               Lock ETH on Base. The oracle handles the rest.
             </p>
 
-            {!wallet && (
+            {!isConnected && (
               <div className="connect-prompt">
                 <p>Connect your wallet to get started.</p>
-                <button className="btn-primary" onClick={connectWallet}>
+                <button className="btn-primary" onClick={() => open()}>
                   Connect Wallet
                 </button>
               </div>
             )}
 
-            {wallet && !chainOk && (
+            {isConnected && !chainOk && (
               <div className="alert alert-warn">
-                Your wallet is not on Base Mainnet. Switch networks in MetaMask to continue.
+                Your wallet is not on Base Mainnet. Switch networks to continue.
               </div>
             )}
 
@@ -263,7 +230,7 @@ export default function App() {
                   placeholder="0xabc123… or &quot;my-task-id&quot;"
                   value={taskHash}
                   onChange={e => setTaskHash(e.target.value)}
-                  disabled={!wallet || !chainOk}
+                  disabled={!isConnected || !chainOk}
                   autoComplete="off"
                   spellCheck="false"
                 />
@@ -277,7 +244,7 @@ export default function App() {
                   placeholder="0x…"
                   value={provider}
                   onChange={e => setProvider(e.target.value)}
-                  disabled={!wallet || !chainOk}
+                  disabled={!isConnected || !chainOk}
                   autoComplete="off"
                   spellCheck="false"
                 />
@@ -293,7 +260,7 @@ export default function App() {
                   step="any"
                   value={amount}
                   onChange={e => setAmount(e.target.value)}
-                  disabled={!wallet || !chainOk}
+                  disabled={!isConnected || !chainOk}
                 />
               </div>
 
@@ -317,7 +284,7 @@ export default function App() {
               <button
                 type="submit"
                 className="btn-primary btn-submit"
-                disabled={!wallet || !chainOk || status?.type === 'loading'}
+                disabled={!isConnected || !chainOk || status?.type === 'loading'}
               >
                 {status?.type === 'loading' ? 'Locking…' : 'Lock ETH'}
               </button>
