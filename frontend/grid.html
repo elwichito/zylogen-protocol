@@ -444,7 +444,7 @@ async function loadHistorical(contract, abi, version, processFn) {
     const provider = new ethers.JsonRpcProvider(RPC);
     const c = new ethers.Contract(contract, abi, provider);
     const currentBlock = await provider.getBlockNumber();
-    const fromBlock = Math.max(currentBlock - 500000, 0);
+    const fromBlock = 0;
 
     log(`Scanning ${version} from block ${fromBlock}...`);
 
