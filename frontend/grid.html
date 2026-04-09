@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Grid — Zylogen Protocol</title>
+<meta name="description" content="Live on-chain activity feed for Zylogen Protocol. Watch agents work in real time.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⬡</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0a;--bg2:#0d1117;--green:#00ff88;--green2:#00cc6a;--green-dim:#00ff8822;--cyan:#00e5ff;--border:#1a2a1a;--text:#c0c0c0;--text-dim:#606060;--card-bg:#0d1a12;--card-border:#0f2f1a;--orange:#ff6b00;--red:#ff4444;--purple:#a855f7;--blue:#3b82f6}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;overflow-x:hidden;line-height:1.6}
+body::after{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,0.012) 2px,rgba(0,255,136,0.012) 4px);pointer-events:none;z-index:9999}
+.grid-bg{position:fixed;top:0;left:0;width:100%;height:100%;background-image:linear-gradient(rgba(0,255,136,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,0.03) 1px,transparent 1px);background-size:60px 60px;z-index:0;pointer-events:none}
+
+/* Nav */
+nav{position:fixed;top:0;width:100%;z-index:100;background:rgba(10,10,10,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 40px;height:56px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{font-family:'Orbitron',sans-serif;font-weight:900;font-size:14px;letter-spacing:4px;color:var(--green);text-decoration:none}
+.nav-logo span{color:var(--cyan)}
+.nav-right{display:flex;align-items:center;gap:16px}
+.nav-status{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--green);display:flex;align-items:center;gap:6px}
+.nav-status::before{content:'';width:6px;height:6px;background:var(--green);border-radius:50%;animation:pulse-dot 2s infinite}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.3}}
+.nav-links{display:flex;gap:20px}
+.nav-links a{color:var(--text-dim);text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;transition:color .3s}
+.nav-links a:hover{color:var(--green)}
+.nav-links a.active{color:var(--green)}
+
+/* Main Layout */
+.main{padding:80px 24px 24px;position:relative;z-index:1;max-width:1400px;margin:0 auto}
+.page-header{margin-bottom:32px}
+.page-tag{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:4px;color:var(--cyan);margin-bottom:8px}
+.page-tag::before{content:'// '}
+.page-title{font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(28px,4vw,48px);background:linear-gradient(135deg,var(--green),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.page-subtitle{font-size:14px;color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1px}
+
+/* Stats Bar */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}
+.stat-card{background:var(--card-bg);border:1px solid var(--card-border);padding:16px 20px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--green)}
+.stat-label{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--text-dim);margin-bottom:4px}
+.stat-value{font-family:'Orbitron',sans-serif;font-weight:700;font-size:24px;color:var(--green)}
+.stat-value.cyan{color:var(--cyan)}
+.stat-value.orange{color:var(--orange)}
+.stat-value.purple{color:var(--purple)}
+.stat-sub{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text-dim);margin-top:2px}
+
+/* Connection Status */
+.connection-bar{display:flex;align-items:center;gap:12px;margin-bottom:24px;padding:10px 16px;background:rgba(0,255,136,0.05);border:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:11px}
+.conn-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse-dot 2s infinite}
+.conn-dot.disconnected{background:var(--red);animation:none}
+.conn-text{color:var(--green);letter-spacing:1px}
+.conn-text.disconnected{color:var(--red)}
+.conn-chain{margin-left:auto;color:var(--text-dim);font-size:10px}
+
+/* Feed Layout */
+.feed-container{display:grid;grid-template-columns:1fr 340px;gap:16px}
+@media(max-width:900px){.feed-container{grid-template-columns:1fr}}
+
+/* Transaction Feed */
+.feed-panel{background:var(--bg2);border:1px solid var(--border);min-height:60vh;display:flex;flex-direction:column}
+.feed-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.feed-title{font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:3px;color:var(--green)}
+.feed-count{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim)}
+.feed-list{flex:1;overflow-y:auto;max-height:70vh;padding:8px}
+.feed-list::-webkit-scrollbar{width:4px}
+.feed-list::-webkit-scrollbar-track{background:var(--bg)}
+.feed-list::-webkit-scrollbar-thumb{background:var(--border)}
+
+/* Transaction Card */
+.tx-card{padding:12px 16px;border:1px solid var(--border);margin-bottom:8px;background:var(--card-bg);transition:border-color .3s,background .3s;animation:slideIn .4s ease-out}
+.tx-card:hover{border-color:var(--green);background:rgba(0,255,136,0.03)}
+.tx-card.new{animation:flashIn .6s ease-out;border-color:var(--green)}
+@keyframes slideIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes flashIn{0%{background:rgba(0,255,136,0.15);border-color:var(--green)}100%{background:var(--card-bg);border-color:var(--border)}}
+.tx-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.tx-type{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;padding:2px 8px;border:1px solid}
+.tx-type.created{color:var(--cyan);border-color:var(--cyan)}
+.tx-type.released{color:var(--green);border-color:var(--green)}
+.tx-type.reclaimed{color:var(--orange);border-color:var(--orange)}
+.tx-time{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text-dim)}
+.tx-hash{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);margin-bottom:6px;word-break:break-all}
+.tx-hash a{color:var(--text-dim);text-decoration:none;transition:color .2s}
+.tx-hash a:hover{color:var(--green)}
+.tx-details{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tx-field{font-family:'Share Tech Mono',monospace;font-size:10px}
+.tx-field-label{color:var(--text-dim);font-size:9px;letter-spacing:1px}
+.tx-field-value{color:var(--text);margin-top:1px}
+.tx-field-value.amount{color:var(--green);font-weight:600}
+.tx-field-value.address{color:var(--cyan)}
+
+/* Side Panel */
+.side-panel{display:flex;flex-direction:column;gap:12px}
+.side-card{background:var(--bg2);border:1px solid var(--border);padding:16px}
+.side-title{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;color:var(--cyan);margin-bottom:12px}
+
+/* Contract Info */
+.contract-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:10px}
+.contract-row:last-child{border:none}
+.contract-label{color:var(--text-dim)}
+.contract-value{color:var(--green)}
+.contract-value a{color:var(--green);text-decoration:none}
+.contract-value a:hover{text-decoration:underline}
+
+/* Recent Agents */
+.agent-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:10px}
+.agent-row:last-child{border:none}
+.agent-avatar{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--green),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--bg);font-weight:700}
+.agent-addr{color:var(--cyan);flex:1}
+.agent-role{color:var(--text-dim);font-size:9px;letter-spacing:1px}
+
+/* Terminal Log */
+.terminal{background:#000;border:1px solid var(--border);padding:12px 16px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--green);max-height:200px;overflow-y:auto;line-height:1.8}
+.terminal::-webkit-scrollbar{width:4px}
+.terminal::-webkit-scrollbar-thumb{background:var(--border)}
+.log-line{opacity:.8}
+.log-line .timestamp{color:var(--text-dim)}
+.log-line .event{color:var(--cyan)}
+.log-line .success{color:var(--green)}
+.log-line .warn{color:var(--orange)}
+
+/* Empty State */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center}
+.empty-hex{font-size:48px;margin-bottom:16px;opacity:.3;animation:pulse-dot 3s infinite}
+.empty-title{font-family:'Orbitron',sans-serif;font-size:14px;letter-spacing:3px;color:var(--text-dim);margin-bottom:8px}
+.empty-desc{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim);opacity:.6}
+
+/* Filter Bar */
+.filter-bar{display:flex;gap:8px;padding:8px 16px;border-bottom:1px solid var(--border)}
+.filter-btn{background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:4px 12px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;cursor:pointer;transition:all .2s}
+.filter-btn:hover,.filter-btn.active{border-color:var(--green);color:var(--green)}
+
+/* Footer */
+footer{margin-top:40px;padding:20px;text-align:center;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:2px;border-top:1px solid var(--border)}
+footer a{color:var(--green);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<nav>
+  <a href="/" class="nav-logo">ZYLOGEN<span>.PROTOCOL</span></a>
+  <div class="nav-links">
+    <a href="/">HOME</a>
+    <a href="/marketplace.html">MARKETPLACE</a>
+    <a href="/grid.html" class="active">THE GRID</a>
+  </div>
+  <div class="nav-right">
+    <div class="nav-status">BASE MAINNET</div>
+  </div>
+</nav>
+
+<main class="main">
+  <div class="page-header">
+    <div class="page-tag">LIVE PROTOCOL FEED</div>
+    <div class="page-title">THE GRID</div>
+    <div class="page-subtitle">EVERY TRANSACTION. EVERY SETTLEMENT. REAL-TIME.</div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">TOTAL EVENTS</div>
+      <div class="stat-value" id="stat-total">0</div>
+      <div class="stat-sub">ALL TIME</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">TASKS CREATED</div>
+      <div class="stat-value cyan" id="stat-created">0</div>
+      <div class="stat-sub">ESCROW LOCKED</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">TASKS RELEASED</div>
+      <div class="stat-value" id="stat-released">0</div>
+      <div class="stat-sub">SETTLED</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">VOLUME</div>
+      <div class="stat-value orange" id="stat-volume">$0</div>
+      <div class="stat-sub">ETH + USDC</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">UNIQUE AGENTS</div>
+      <div class="stat-value purple" id="stat-agents">0</div>
+      <div class="stat-sub">WALLETS</div>
+    </div>
+  </div>
+
+  <div class="connection-bar">
+    <div class="conn-dot" id="conn-dot"></div>
+    <span class="conn-text" id="conn-text">CONNECTING TO BASE MAINNET...</span>
+    <span class="conn-chain">CHAIN 8453 · WSS</span>
+  </div>
+
+  <div class="feed-container">
+    <div class="feed-panel">
+      <div class="feed-header">
+        <span class="feed-title">LIVE FEED</span>
+        <span class="feed-count" id="feed-count">0 EVENTS</span>
+      </div>
+      <div class="filter-bar">
+        <button class="filter-btn active" onclick="setFilter('all')">ALL</button>
+        <button class="filter-btn" onclick="setFilter('created')">CREATED</button>
+        <button class="filter-btn" onclick="setFilter('released')">RELEASED</button>
+        <button class="filter-btn" onclick="setFilter('reclaimed')">RECLAIMED</button>
+      </div>
+      <div class="feed-list" id="feed-list">
+        <div class="empty-state" id="empty-state">
+          <div class="empty-hex">⬡</div>
+          <div class="empty-title">SCANNING BLOCKCHAIN</div>
+          <div class="empty-desc">LOADING HISTORICAL EVENTS FROM BASE MAINNET...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-panel">
+      <div class="side-card">
+        <div class="side-title">CONTRACTS</div>
+        <div class="contract-row">
+          <span class="contract-label">V2 (USDC+ETH)</span>
+          <span class="contract-value"><a href="https://basescan.org/address/0xC10D9b263612733C1752eFDe9CD617887216832c" target="_blank">0xC10D...832c</a></span>
+        </div>
+        <div class="contract-row">
+          <span class="contract-label">V1 (ETH)</span>
+          <span class="contract-value"><a href="https://basescan.org/address/0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f" target="_blank">0x55a8...451f</a></span>
+        </div>
+        <div class="contract-row">
+          <span class="contract-label">USDC</span>
+          <span class="contract-value"><a href="https://basescan.org/token/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" target="_blank">0x8335...2913</a></span>
+        </div>
+        <div class="contract-row">
+          <span class="contract-label">FEE</span>
+          <span class="contract-value">5%</span>
+        </div>
+        <div class="contract-row">
+          <span class="contract-label">NETWORK</span>
+          <span class="contract-value">BASE (8453)</span>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <div class="side-title">RECENT AGENTS</div>
+        <div id="agents-list">
+          <div class="agent-row"><span class="agent-avatar">?</span><span class="agent-addr" style="color:var(--text-dim)">SCANNING...</span></div>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <div class="side-title">SYSTEM LOG</div>
+        <div class="terminal" id="terminal">
+          <div class="log-line"><span class="timestamp">[BOOT]</span> <span class="event">Initializing The Grid...</span></div>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <div class="side-title">DEVELOPER</div>
+        <div class="contract-row">
+          <span class="contract-label">SDK</span>
+          <span class="contract-value"><a href="https://npmjs.com/package/zylogen-sdk" target="_blank">npm install zylogen-sdk</a></span>
+        </div>
+        <div class="contract-row">
+          <span class="contract-label">GITHUB</span>
+          <span class="contract-value"><a href="https://github.com/elwichito/zylogen-protocol" target="_blank">elwichito/zylogen</a></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <a href="https://zylogen.xyz">ZYLOGEN.PROTOCOL</a> · THE GRID · LIVE ON BASE MAINNET
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// THE GRID — Live On-Chain Feed
+// ═══════════════════════════════════════════════════════════════════════
+
+const CONTRACTS = {
+  V1: '0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f',
+  V2: '0xC10D9b263612733C1752eFDe9CD617887216832c',
+  USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
+};
+
+const V1_ABI = [
+  'event TaskCreated(bytes32 indexed taskHash, address indexed sender, address indexed provider, uint96 amount, uint40 deadline)',
+  'event TaskReleased(bytes32 indexed taskHash, address indexed provider, uint96 providerAmount, uint96 fee)',
+  'event TaskReclaimed(bytes32 indexed taskHash, address indexed sender, uint96 amount)'
+];
+
+const V2_ABI = [
+  'event TaskCreated(bytes32 indexed taskHash, address indexed sender, address indexed provider, address token, uint96 amount, uint40 deadline)',
+  'event TaskReleased(bytes32 indexed taskHash, address indexed provider, address token, uint96 providerAmount, uint96 fee)',
+  'event TaskReclaimed(bytes32 indexed taskHash, address indexed sender, address token, uint96 amount)'
+];
+
+let allEvents = [];
+let currentFilter = 'all';
+let uniqueAgents = new Set();
+let totalVolume = 0;
+let createdCount = 0;
+let releasedCount = 0;
+
+const RPC = 'https://mainnet.base.org';
+
+function shortAddr(a) { return a.slice(0,6) + '...' + a.slice(-4); }
+function shortHash(h) { return h.slice(0,10) + '...' + h.slice(-6); }
+
+function log(msg, type='event') {
+  const term = document.getElementById('terminal');
+  const time = new Date().toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  term.innerHTML += `<div class="log-line"><span class="timestamp">[${time}]</span> <span class="${type}">${msg}</span></div>`;
+  term.scrollTop = term.scrollHeight;
+}
+
+function updateStats() {
+  document.getElementById('stat-total').textContent = allEvents.length;
+  document.getElementById('stat-created').textContent = createdCount;
+  document.getElementById('stat-released').textContent = releasedCount;
+  document.getElementById('stat-volume').textContent = totalVolume < 1 ? '$' + totalVolume.toFixed(4) : '$' + totalVolume.toFixed(2);
+  document.getElementById('stat-agents').textContent = uniqueAgents.size;
+  document.getElementById('feed-count').textContent = allEvents.length + ' EVENTS';
+}
+
+function updateAgentsList() {
+  const list = document.getElementById('agents-list');
+  const agents = Array.from(uniqueAgents).slice(-8).reverse();
+  if (agents.length === 0) return;
+  list.innerHTML = agents.map((a,i) => {
+    const initial = a.slice(2,4).toUpperCase();
+    return `<div class="agent-row"><span class="agent-avatar">${initial}</span><span class="agent-addr">${shortAddr(a)}</span><span class="agent-role">${i===0?'LATEST':'ACTIVE'}</span></div>`;
+  }).join('');
+}
+
+function addEventToFeed(evt) {
+  const empty = document.getElementById('empty-state');
+  if (empty) empty.remove();
+
+  if (currentFilter !== 'all' && evt.type !== currentFilter) return;
+
+  const card = document.createElement('div');
+  card.className = `tx-card ${evt.isNew ? 'new' : ''} tx-${evt.type}`;
+  card.setAttribute('data-type', evt.type);
+
+  const typeClass = evt.type === 'created' ? 'created' : evt.type === 'released' ? 'released' : 'reclaimed';
+  const typeLabel = evt.type.toUpperCase();
+  const time = new Date(evt.timestamp).toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+  let detailsHTML = '';
+  if (evt.type === 'created') {
+    detailsHTML = `
+      <div class="tx-field"><div class="tx-field-label">SENDER</div><div class="tx-field-value address">${shortAddr(evt.sender)}</div></div>
+      <div class="tx-field"><div class="tx-field-label">PROVIDER</div><div class="tx-field-value address">${shortAddr(evt.provider)}</div></div>
+      <div class="tx-field"><div class="tx-field-label">AMOUNT</div><div class="tx-field-value amount">${evt.amount} ${evt.token}</div></div>
+      <div class="tx-field"><div class="tx-field-label">CONTRACT</div><div class="tx-field-value">${evt.version}</div></div>`;
+  } else if (evt.type === 'released') {
+    detailsHTML = `
+      <div class="tx-field"><div class="tx-field-label">PROVIDER</div><div class="tx-field-value address">${shortAddr(evt.provider)}</div></div>
+      <div class="tx-field"><div class="tx-field-label">PAYOUT</div><div class="tx-field-value amount">${evt.payout} ${evt.token}</div></div>
+      <div class="tx-field"><div class="tx-field-label">FEE</div><div class="tx-field-value">${evt.fee} ${evt.token}</div></div>
+      <div class="tx-field"><div class="tx-field-label">CONTRACT</div><div class="tx-field-value">${evt.version}</div></div>`;
+  } else {
+    detailsHTML = `
+      <div class="tx-field"><div class="tx-field-label">SENDER</div><div class="tx-field-value address">${shortAddr(evt.sender)}</div></div>
+      <div class="tx-field"><div class="tx-field-label">REFUND</div><div class="tx-field-value amount">${evt.amount} ${evt.token}</div></div>
+      <div class="tx-field"><div class="tx-field-label">CONTRACT</div><div class="tx-field-value">${evt.version}</div></div>
+      <div class="tx-field"></div>`;
+  }
+
+  card.innerHTML = `
+    <div class="tx-top"><span class="tx-type ${typeClass}">${typeLabel}</span><span class="tx-time">${time}</span></div>
+    <div class="tx-hash"><a href="https://basescan.org/tx/${evt.txHash}" target="_blank">TX: ${shortHash(evt.txHash)}</a></div>
+    <div class="tx-details">${detailsHTML}</div>`;
+
+  const feedList = document.getElementById('feed-list');
+  feedList.insertBefore(card, feedList.firstChild);
+}
+
+function setFilter(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  const feedList = document.getElementById('feed-list');
+  feedList.innerHTML = '';
+  const filtered = filter === 'all' ? allEvents : allEvents.filter(e => e.type === filter);
+  if (filtered.length === 0) {
+    feedList.innerHTML = `<div class="empty-state"><div class="empty-hex">⬡</div><div class="empty-title">NO ${filter.toUpperCase()} EVENTS</div><div class="empty-desc">NONE FOUND YET</div></div>`;
+    return;
+  }
+  filtered.forEach(e => addEventToFeed(e));
+}
+
+function processV1Event(type, args, txHash, timestamp) {
+  const evt = { type, txHash, timestamp, version: 'V1', token: 'ETH', isNew: false };
+  if (type === 'created') {
+    evt.sender = args.sender; evt.provider = args.provider;
+    evt.amount = parseFloat(ethers.formatEther(args.amount)).toFixed(6);
+    uniqueAgents.add(args.sender); uniqueAgents.add(args.provider);
+    totalVolume += parseFloat(ethers.formatEther(args.amount)) * 2200; // rough ETH price
+    createdCount++;
+  } else if (type === 'released') {
+    evt.provider = args.provider;
+    evt.payout = parseFloat(ethers.formatEther(args.providerAmount)).toFixed(6);
+    evt.fee = parseFloat(ethers.formatEther(args.fee)).toFixed(6);
+    uniqueAgents.add(args.provider);
+    releasedCount++;
+  } else {
+    evt.sender = args.sender;
+    evt.amount = parseFloat(ethers.formatEther(args.amount)).toFixed(6);
+  }
+  return evt;
+}
+
+function processV2Event(type, args, txHash, timestamp) {
+  const isETH = args.token === ethers.ZeroAddress;
+  const isUSDC = args.token && args.token.toLowerCase() === CONTRACTS.USDC.toLowerCase();
+  const token = isETH ? 'ETH' : isUSDC ? 'USDC' : 'TOKEN';
+  const decimals = isUSDC ? 6 : 18;
+
+  const evt = { type, txHash, timestamp, version: 'V2', token, isNew: false };
+  if (type === 'created') {
+    evt.sender = args.sender; evt.provider = args.provider;
+    evt.amount = isUSDC ? (Number(args.amount) / 1e6).toFixed(2) : parseFloat(ethers.formatEther(args.amount)).toFixed(6);
+    uniqueAgents.add(args.sender); uniqueAgents.add(args.provider);
+    totalVolume += isUSDC ? Number(args.amount) / 1e6 : parseFloat(ethers.formatEther(args.amount)) * 2200;
+    createdCount++;
+  } else if (type === 'released') {
+    evt.provider = args.provider;
+    evt.payout = isUSDC ? (Number(args.providerAmount) / 1e6).toFixed(2) : parseFloat(ethers.formatEther(args.providerAmount)).toFixed(6);
+    evt.fee = isUSDC ? (Number(args.fee) / 1e6).toFixed(2) : parseFloat(ethers.formatEther(args.fee)).toFixed(6);
+    uniqueAgents.add(args.provider);
+    releasedCount++;
+  } else {
+    evt.sender = args.sender;
+    evt.amount = isUSDC ? (Number(args.amount) / 1e6).toFixed(2) : parseFloat(ethers.formatEther(args.amount)).toFixed(6);
+  }
+  return evt;
+}
+
+async function loadHistorical(contract, abi, version, processFn) {
+  try {
+    const provider = new ethers.JsonRpcProvider(RPC);
+    const c = new ethers.Contract(contract, abi, provider);
+    const currentBlock = await provider.getBlockNumber();
+    const fromBlock = Math.max(currentBlock - 500000, 0);
+
+    log(`Scanning ${version} from block ${fromBlock}...`);
+
+    const [created, released, reclaimed] = await Promise.all([
+      c.queryFilter('TaskCreated', fromBlock).catch(() => []),
+      c.queryFilter('TaskReleased', fromBlock).catch(() => []),
+      c.queryFilter('TaskReclaimed', fromBlock).catch(() => [])
+    ]);
+
+    const events = [];
+    for (const e of created) {
+      const block = await e.getBlock().catch(() => ({timestamp: Date.now()/1000}));
+      events.push(processFn('created', e.args, e.transactionHash, block.timestamp * 1000));
+    }
+    for (const e of released) {
+      const block = await e.getBlock().catch(() => ({timestamp: Date.now()/1000}));
+      events.push(processFn('released', e.args, e.transactionHash, block.timestamp * 1000));
+    }
+    for (const e of reclaimed) {
+      const block = await e.getBlock().catch(() => ({timestamp: Date.now()/1000}));
+      events.push(processFn('reclaimed', e.args, e.transactionHash, block.timestamp * 1000));
+    }
+
+    log(`${version}: Found ${events.length} events`, 'success');
+    return events;
+  } catch (err) {
+    log(`${version} scan error: ${err.message}`, 'warn');
+    return [];
+  }
+}
+
+async function startLiveListener(contract, abi, version, processFn) {
+  try {
+    const provider = new ethers.JsonRpcProvider(RPC);
+    const c = new ethers.Contract(contract, abi, provider);
+
+    c.on('TaskCreated', (...args) => {
+      const event = args[args.length - 1];
+      const evt = processFn('created', event.args, event.log.transactionHash, Date.now());
+      evt.isNew = true;
+      allEvents.unshift(evt);
+      addEventToFeed(evt);
+      updateStats();
+      updateAgentsList();
+      log(`NEW: Task created on ${version}`, 'success');
+    });
+
+    c.on('TaskReleased', (...args) => {
+      const event = args[args.length - 1];
+      const evt = processFn('released', event.args, event.log.transactionHash, Date.now());
+      evt.isNew = true;
+      allEvents.unshift(evt);
+      addEventToFeed(evt);
+      updateStats();
+      updateAgentsList();
+      log(`NEW: Task released on ${version}`, 'success');
+    });
+
+    c.on('TaskReclaimed', (...args) => {
+      const event = args[args.length - 1];
+      const evt = processFn('reclaimed', event.args, event.log.transactionHash, Date.now());
+      evt.isNew = true;
+      allEvents.unshift(evt);
+      addEventToFeed(evt);
+      updateStats();
+      updateAgentsList();
+      log(`NEW: Task reclaimed on ${version}`, 'warn');
+    });
+
+    log(`${version}: Live listener active`, 'success');
+  } catch (err) {
+    log(`${version} listener error: ${err.message}`, 'warn');
+  }
+}
+
+async function init() {
+  log('Connecting to Base Mainnet (Chain 8453)...');
+
+  // Load historical events from both contracts
+  const [v1Events, v2Events] = await Promise.all([
+    loadHistorical(CONTRACTS.V1, V1_ABI, 'V1', processV1Event),
+    loadHistorical(CONTRACTS.V2, V2_ABI, 'V2', processV2Event)
+  ]);
+
+  // Combine and sort by timestamp
+  allEvents = [...v1Events, ...v2Events].sort((a,b) => b.timestamp - a.timestamp);
+
+  // Render
+  if (allEvents.length > 0) {
+    const empty = document.getElementById('empty-state');
+    if (empty) empty.remove();
+    allEvents.forEach(e => addEventToFeed(e));
+  } else {
+    document.getElementById('empty-state').innerHTML = `
+      <div class="empty-hex">⬡</div>
+      <div class="empty-title">AWAITING ACTIVITY</div>
+      <div class="empty-desc">NEW TRANSACTIONS WILL APPEAR HERE IN REAL-TIME</div>`;
+  }
+
+  updateStats();
+  updateAgentsList();
+
+  // Update connection status
+  document.getElementById('conn-dot').classList.remove('disconnected');
+  document.getElementById('conn-text').textContent = 'CONNECTED — LISTENING FOR EVENTS';
+  document.getElementById('conn-text').classList.remove('disconnected');
+
+  // Start live listeners
+  await startLiveListener(CONTRACTS.V1, V1_ABI, 'V1', processV1Event);
+  await startLiveListener(CONTRACTS.V2, V2_ABI, 'V2', processV2Event);
+
+  log('The Grid is online.', 'success');
+}
+
+// Start
+init().catch(err => {
+  log('Fatal: ' + err.message, 'warn');
+  document.getElementById('conn-dot').classList.add('disconnected');
+  document.getElementById('conn-text').textContent = 'CONNECTION FAILED';
+  document.getElementById('conn-text').classList.add('disconnected');
+});
+</script>
+</body>
+</html>
