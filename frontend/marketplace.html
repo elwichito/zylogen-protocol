@@ -507,7 +507,7 @@ async function submitWork() {
 async function loadEvents(readContract, readProvider) {
   try {
     const currentBlock = await readProvider.getBlockNumber();
-    const fromBlock = Math.max(0, currentBlock - 9000);
+    const fromBlock = 44370000;
 
     const [created, released, reclaimed] = await Promise.all([
       readContract.queryFilter('TaskCreated', fromBlock),
