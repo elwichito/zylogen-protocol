@@ -197,18 +197,7 @@ The validation prompt in `validateWithClaude()` can be augmented with off-chain 
 
 ---
 
-## Budget Breakdown
 
-Built with a **$200 total budget**.
-
-| Item | Cost |
-|------|------|
-| Base Mainnet deployment gas | ~$2 |
-| Alchemy RPC (free tier) | $0 |
-| Vercel hosting (free tier) | $0 |
-| Claude API (~$0.01 per validation) | ~$1 |
-| Misc | ~$197 remaining |
-| **Total** | **< $200** |
 
 Infrastructure costs at scale are dominated by Claude API usage (~$0.01 per task validated) and Base L2 gas (sub-cent per transaction).
 
