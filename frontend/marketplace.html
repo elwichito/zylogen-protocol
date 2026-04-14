@@ -261,7 +261,7 @@ nav{position:fixed;top:0;width:100%;z-index:100;background:rgba(10,10,10,0.95);b
 // CONFIG
 const CONTRACT = '0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f';
 const ORACLE_API = 'https://zylogen-protocol-production.up.railway.app';
-const RPC = 'https://base.publicnode.com';
+const RPC = 'https://base.drpc.org';
 const CHAIN_ID = '0x2105';
 const ABI = [
   'function lock(bytes32 taskHash, address provider) external payable',
@@ -508,7 +508,7 @@ async function loadEvents(readContract, readProvider) {
   try {
     const currentBlock = await readProvider.getBlockNumber();
     const startBlock = 44370000;
-    const CHUNK = 49000;
+    const CHUNK = 9500;
 
     let created = [], released = [], reclaimed = [];
     for (let from = startBlock; from <= currentBlock; from += CHUNK) {

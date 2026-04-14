@@ -303,7 +303,7 @@ let totalVolume = 0;
 let createdCount = 0;
 let releasedCount = 0;
 
-const RPC = 'https://base.publicnode.com';
+const RPC = 'https://base.drpc.org';
 
 function shortAddr(a) { return a.slice(0,6) + '...' + a.slice(-4); }
 function shortHash(h) { return h.slice(0,10) + '...' + h.slice(-6); }
@@ -445,7 +445,7 @@ async function loadHistorical(contract, abi, version, processFn) {
     const c = new ethers.Contract(contract, abi, provider);
     const currentBlock = await provider.getBlockNumber();
     const startBlock = 44370000;
-    const CHUNK = 49000;
+    const CHUNK = 9500;
 
     log(`Scanning ${version} from block ${startBlock} to ${currentBlock} in chunks...`);
 
