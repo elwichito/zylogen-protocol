@@ -439,45 +439,58 @@ function processV2Event(type, args, txHash, timestamp) {
   return evt;
 }
 
-async function loadHistorical(contract, abi, version, processFn) {
+async function fetchLogs(address, topic, fromBlock, toBlock) {
+    const hex = n => '0x' + n.toString(16);
+    const resp = await fetch(RPC, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({jsonrpc:'2.0',method:'eth_getLogs',params:[{address,topics:[topic],fromBlock:hex(fromBlock),toBlock:hex(toBlock)}],id:1})
+    });
+    const data = await resp.json();
+    return data.result || [];
+  }
+
+  async function loadHistorical(contract, abi, version, processFn) {
   try {
-    const provider = new ethers.JsonRpcProvider(RPC);
-    const c = new ethers.Contract(contract, abi, provider);
-    const currentBlock = await provider.getBlockNumber();
+    const iface = new ethers.Interface(abi);
+    const topics = {
+      created: iface.getEvent('TaskCreated').topicHash,
+      released: iface.getEvent('TaskReleased').topicHash,
+      reclaimed: iface.getEvent('TaskReclaimed').topicHash
+    };
+
+    const resp = await fetch(RPC, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({jsonrpc:'2.0',method:'eth_blockNumber',params:[],id:0})
+    });
+    const bn = await resp.json();
+    const currentBlock = parseInt(bn.result, 16);
     const startBlock = 44370000;
     const CHUNK = 9500;
 
     log(`Scanning ${version} from block ${startBlock} to ${currentBlock} in chunks...`);
 
-    let created = [], released = [], reclaimed = [];
+    let allLogs = [];
     for (let from = startBlock; from <= currentBlock; from += CHUNK) {
       const to = Math.min(from + CHUNK - 1, currentBlock);
       try {
-        const [c1, r1, x1] = await Promise.all([
-          c.queryFilter('TaskCreated', from, to),
-          c.queryFilter('TaskReleased', from, to),
-          c.queryFilter('TaskReclaimed', from, to)
-        ]);
-        created = created.concat(c1);
-        released = released.concat(r1);
-        reclaimed = reclaimed.concat(x1);
+        const logs = await fetchLogs(contract, null, from, to);
+        allLogs = allLogs.concat(logs);
       } catch(e) {
         log(`${version} chunk ${from}-${to} error: ${e.message}`, 'warn');
       }
     }
 
     const events = [];
-    for (const e of created) {
-      const block = await e.getBlock().catch(() => ({timestamp: Date.now()/1000}));
-      events.push(processFn('created', e.args, e.transactionHash, block.timestamp * 1000));
-    }
-    for (const e of released) {
-      const block = await e.getBlock().catch(() => ({timestamp: Date.now()/1000}));
-      events.push(processFn('released', e.args, e.transactionHash, block.timestamp * 1000));
-    }
-    for (const e of reclaimed) {
-      const block = await e.getBlock().catch(() => ({timestamp: Date.now()/1000}));
-      events.push(processFn('reclaimed', e.args, e.transactionHash, block.timestamp * 1000));
+    for (const rawLog of allLogs) {
+      try {
+        const parsed = iface.parseLog({topics: rawLog.topics, data: rawLog.data});
+        const blockNum = parseInt(rawLog.blockNumber, 16);
+        let eventType = 'created';
+        if (parsed.name === 'TaskReleased') eventType = 'released';
+        if (parsed.name === 'TaskReclaimed') eventType = 'reclaimed';
+        events.push(processFn(eventType, parsed.args, rawLog.transactionHash, blockNum * 1000));
+      } catch(e) {}
     }
 
     log(`${version}: Found ${events.length} events`, 'success');

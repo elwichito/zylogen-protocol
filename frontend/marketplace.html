@@ -506,25 +506,42 @@ async function submitWork() {
 // LOAD EVENTS FROM CHAIN
 async function loadEvents(readContract, readProvider) {
   try {
-    const currentBlock = await readProvider.getBlockNumber();
+    const hex = n => '0x' + n.toString(16);
+    const bnResp = await fetch(RPC, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({jsonrpc:'2.0',method:'eth_blockNumber',params:[],id:0})
+    });
+    const bnData = await bnResp.json();
+    const currentBlock = parseInt(bnData.result, 16);
     const startBlock = 44370000;
     const CHUNK = 9500;
+    const iface = new ethers.Interface(ABI);
 
-    let created = [], released = [], reclaimed = [];
+    let allLogs = [];
     for (let from = startBlock; from <= currentBlock; from += CHUNK) {
       const to = Math.min(from + CHUNK - 1, currentBlock);
       try {
-        const [c1, r1, x1] = await Promise.all([
-          readContract.queryFilter('TaskCreated', from, to),
-          readContract.queryFilter('TaskReleased', from, to),
-          readContract.queryFilter('TaskReclaimed', from, to)
-        ]);
-        created = created.concat(c1);
-        released = released.concat(r1);
-        reclaimed = reclaimed.concat(x1);
+        const resp = await fetch(RPC, {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({jsonrpc:'2.0',method:'eth_getLogs',params:[{address:CONTRACT,fromBlock:hex(from),toBlock:hex(to)}],id:1})
+        });
+        const data = await resp.json();
+        if (data.result) allLogs = allLogs.concat(data.result);
       } catch(e) {
         console.error('Chunk error:', from, to, e.message);
       }
+    }
+
+    const created = [], released = [], reclaimed = [];
+    for (const raw of allLogs) {
+      try {
+        const parsed = iface.parseLog({topics: raw.topics, data: raw.data});
+        const block = parseInt(raw.blockNumber, 16);
+        const obj = { args: parsed.args, blockNumber: block, transactionHash: raw.transactionHash };
+        if (parsed.name === 'TaskCreated') created.push(obj);
+        else if (parsed.name === 'TaskReleased') released.push(obj);
+        else if (parsed.name === 'TaskReclaimed') reclaimed.push(obj);
+      } catch(e) {}
     }
 
     const releasedHashes = new Set(released.map(e => e.args[0]));
