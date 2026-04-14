@@ -513,14 +513,18 @@ async function loadEvents(readContract, readProvider) {
     let created = [], released = [], reclaimed = [];
     for (let from = startBlock; from <= currentBlock; from += CHUNK) {
       const to = Math.min(from + CHUNK - 1, currentBlock);
-      const [c1, r1, x1] = await Promise.all([
-        readContract.queryFilter('TaskCreated', from, to).catch(() => []),
-        readContract.queryFilter('TaskReleased', from, to).catch(() => []),
-        readContract.queryFilter('TaskReclaimed', from, to).catch(() => [])
-      ]);
-      created = created.concat(c1);
-      released = released.concat(r1);
-      reclaimed = reclaimed.concat(x1);
+      try {
+        const [c1, r1, x1] = await Promise.all([
+          readContract.queryFilter('TaskCreated', from, to),
+          readContract.queryFilter('TaskReleased', from, to),
+          readContract.queryFilter('TaskReclaimed', from, to)
+        ]);
+        created = created.concat(c1);
+        released = released.concat(r1);
+        reclaimed = reclaimed.concat(x1);
+      } catch(e) {
+        console.error('Chunk error:', from, to, e.message);
+      }
     }
 
     const releasedHashes = new Set(released.map(e => e.args[0]));
