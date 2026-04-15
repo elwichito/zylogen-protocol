@@ -17,15 +17,15 @@ const base = {
 const metadata = {
   name: 'Zylogen Protocol',
   description: 'Trustless escrow for AI-native work',
-  url: typeof window !== 'undefined' ? window.location.origin : 'https://zylogen.vercel.app',
-  icons: [],
+  url: 'https://zylogen.xyz',
+  icons: ['https://zylogen.xyz/favicon.ico'],
 }
 
 const ethersConfig = defaultConfig({
   metadata,
   enableEIP6963: true,
   enableInjected: true,
-  enableCoinbase: false,
+  enableCoinbase: true,
   rpcUrl: 'https://mainnet.base.org',
   defaultChainId: 8453,
 })
