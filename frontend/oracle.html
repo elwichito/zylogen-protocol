@@ -243,7 +243,7 @@ function getApiReasoning(taskHash) {
 function renderDecision(d) {
   const typeClass = d.type;
   const typeLabel = d.type === 'created' ? 'ESCROW LOCKED' : d.type === 'released' ? 'APPROVED' : 'RECLAIMED';
-  const apiReason = getApiReasoning(d.taskHash);
+  const apiReason = (d.apiEval && d.apiEval.reason) || getApiReasoning(d.taskHash);
   const reasoning = apiReason || getOracleReasoning(d);
   const apiTask = apiTasks.get(d.taskHash);
   const title = apiTask ? apiTask.title : null;
@@ -404,6 +404,26 @@ async function init() {
   ]);
 
   allDecisions = [...v1, ...v2].sort((a,b) => b.block - a.block);
+
+  // Merge API-evaluated tasks not in on-chain data
+  const apiOnlyTasks = Array.from(apiTasks.values())
+    .filter(t => t.evaluation && !allDecisions.find(d => d.taskHash === t.taskHash))
+    .map(t => ({
+      type: t.status === 'released' ? 'released' : t.status === 'rejected' ? 'reclaimed' : 'created',
+      taskHash: t.taskHash,
+      txHash: t.txHash || null,
+      block: 0,
+      version: 'API',
+      token: 'ETH',
+      sender: t.sender,
+      provider: t.provider,
+      amount: t.amount || '\u2014',
+      payout: t.amount || '\u2014',
+      fee: '\u2014',
+      deadline: null,
+      apiEval: t.evaluation
+    }));
+  allDecisions = [...allDecisions, ...apiOnlyTasks];
 
   const container = document.getElementById('decisions-list');
   if (allDecisions.length === 0) {
