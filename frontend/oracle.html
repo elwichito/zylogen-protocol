@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oracle Dashboard — Zylogen Protocol</title>
+<meta name="description" content="Transparent AI oracle decisions for Zylogen Protocol. Every validation, every settlement, fully visible on-chain.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⬡</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0a;--bg2:#0d1117;--green:#00ff88;--green2:#00cc6a;--green-dim:#00ff8822;--cyan:#00e5ff;--border:#1a2a1a;--text:#c0c0c0;--text-dim:#606060;--card-bg:#0d1a12;--card-border:#0f2f1a;--orange:#ff6b00;--red:#ff4444;--purple:#a855f7;--blue:#3b82f6}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;overflow-x:hidden;line-height:1.6}
+body::after{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,0.012) 2px,rgba(0,255,136,0.012) 4px);pointer-events:none;z-index:9999}
+.grid-bg{position:fixed;top:0;left:0;width:100%;height:100%;background-image:linear-gradient(rgba(0,255,136,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,0.03) 1px,transparent 1px);background-size:60px 60px;z-index:0;pointer-events:none}
+
+nav{position:fixed;top:0;width:100%;z-index:100;background:rgba(10,10,10,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 40px;height:56px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{font-family:'Orbitron',sans-serif;font-weight:900;font-size:14px;letter-spacing:4px;color:var(--green);text-decoration:none}.nav-logo span{color:var(--cyan)}
+.nav-links{display:flex;gap:20px}
+.nav-links a{color:var(--text-dim);text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;transition:color .3s}
+.nav-links a:hover,.nav-links a.active{color:var(--green)}
+.nav-right{display:flex;align-items:center;gap:16px}
+.nav-status{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--green);display:flex;align-items:center;gap:6px}
+.nav-status::before{content:'';width:6px;height:6px;background:var(--green);border-radius:50%;animation:pulse-dot 2s infinite}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.3}}
+
+.main{padding:80px 24px 40px;position:relative;z-index:1;max-width:1200px;margin:0 auto}
+.page-header{margin-bottom:32px}
+.page-tag{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:4px;color:var(--cyan);margin-bottom:8px}.page-tag::before{content:'// '}
+.page-title{font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(28px,4vw,44px);background:linear-gradient(135deg,var(--purple),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.page-subtitle{font-size:14px;color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1px;max-width:600px;line-height:1.8}
+
+/* Oracle Stats */
+.oracle-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:32px}
+.o-stat{background:var(--card-bg);border:1px solid var(--card-border);padding:20px;position:relative;overflow:hidden}
+.o-stat::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%}
+.o-stat.green::before{background:var(--green)}
+.o-stat.cyan::before{background:var(--cyan)}
+.o-stat.purple::before{background:var(--purple)}
+.o-stat.orange::before{background:var(--orange)}
+.o-stat-label{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--text-dim);margin-bottom:4px}
+.o-stat-value{font-family:'Orbitron',sans-serif;font-weight:700;font-size:28px;color:var(--green)}
+.o-stat-value.cyan{color:var(--cyan)}
+.o-stat-value.purple{color:var(--purple)}
+.o-stat-value.orange{color:var(--orange)}
+.o-stat-sub{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text-dim);margin-top:2px}
+
+/* Transparency Explainer */
+.explainer{background:var(--bg2);border:1px solid var(--border);padding:24px;margin-bottom:32px;display:flex;gap:24px;align-items:flex-start}
+.explainer-icon{font-size:32px;flex-shrink:0}
+.explainer-text h3{font-family:'Orbitron',sans-serif;font-size:13px;color:var(--purple);letter-spacing:2px;margin-bottom:8px}
+.explainer-text p{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim);line-height:1.8;letter-spacing:.5px}
+
+/* Decision Cards */
+.decisions-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.decisions-title{font-family:'Orbitron',sans-serif;font-size:14px;color:var(--green);letter-spacing:2px}
+.decisions-count{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim)}
+
+.decision-card{background:var(--card-bg);border:1px solid var(--card-border);margin-bottom:8px;overflow:hidden;transition:border-color .3s}
+.decision-card:hover{border-color:var(--green)}
+.decision-top{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border)}
+.decision-badge{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;padding:3px 10px;border:1px solid;flex-shrink:0}
+.decision-badge.created{color:var(--cyan);border-color:var(--cyan)}
+.decision-badge.released{color:var(--green);border-color:var(--green)}
+.decision-badge.reclaimed{color:var(--orange);border-color:var(--orange)}
+.decision-badge.pending{color:var(--purple);border-color:var(--purple)}
+.decision-hash{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);flex:1}
+.decision-hash a{color:var(--text-dim);text-decoration:none;transition:color .2s}.decision-hash a:hover{color:var(--green)}
+.decision-time{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text-dim)}
+
+.decision-body{padding:16px 20px}
+.decision-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px}
+.decision-field{font-family:'Share Tech Mono',monospace;font-size:10px}
+.decision-field-label{color:var(--text-dim);font-size:9px;letter-spacing:1px;margin-bottom:2px}
+.decision-field-value{color:var(--text)}
+.decision-field-value.green{color:var(--green)}
+.decision-field-value.cyan{color:var(--cyan)}
+.decision-field-value.orange{color:var(--orange)}
+
+/* Oracle Reasoning */
+.oracle-reasoning{background:var(--bg);border:1px solid var(--border);padding:12px 16px;margin-top:12px}
+.oracle-reasoning-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.oracle-reasoning-icon{font-size:16px}
+.oracle-reasoning-label{font-family:'Orbitron',sans-serif;font-size:10px;color:var(--purple);letter-spacing:2px}
+.oracle-reasoning-text{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text);line-height:1.8;letter-spacing:.5px}
+
+/* Timeline */
+.timeline-bar{height:4px;background:var(--border);margin-top:8px;position:relative;overflow:hidden}
+.timeline-fill{height:100%;transition:width 1s ease}
+.timeline-fill.created{background:var(--cyan)}
+.timeline-fill.released{background:var(--green);width:100%}
+.timeline-fill.reclaimed{background:var(--orange);width:100%}
+.timeline-fill.pending{background:var(--purple);width:50%;animation:pulse-bar 2s infinite}
+@keyframes pulse-bar{0%,100%{opacity:.5}50%{opacity:1}}
+
+/* Loading */
+.loading{text-align:center;padding:60px;font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--green);letter-spacing:2px}
+.loading-spinner{display:inline-block;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 1s linear infinite;margin-bottom:12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Empty */
+.empty-state{text-align:center;padding:60px;background:var(--card-bg);border:1px solid var(--border)}
+.empty-icon{font-size:48px;margin-bottom:16px;opacity:.3}
+.empty-title{font-family:'Orbitron',sans-serif;font-size:14px;color:var(--text-dim);letter-spacing:2px;margin-bottom:8px}
+.empty-desc{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim)}
+
+footer{margin-top:40px;padding:20px;text-align:center;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:2px;border-top:1px solid var(--border)}
+footer a{color:var(--green);text-decoration:none}
+
+@media(max-width:768px){
+  .main{padding:70px 16px 16px}
+  nav{padding:0 16px}
+  .nav-links{display:none}
+  .explainer{flex-direction:column;gap:12px}
+  .decision-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<nav>
+  <a href="/" class="nav-logo">ZYLOGEN<span>.PROTOCOL</span></a>
+  <div class="nav-links">
+    <a href="/">HOME</a>
+    <a href="/marketplace.html">MARKETPLACE</a>
+    <a href="/grid.html">THE GRID</a>
+    <a href="/oracle.html" class="active">ORACLE</a>
+  </div>
+  <div class="nav-right">
+    <div class="nav-status">ORACLE ACTIVE</div>
+  </div>
+</nav>
+
+<main class="main">
+  <div class="page-header">
+    <div class="page-tag">TRANSPARENCY DASHBOARD</div>
+    <div class="page-title">THE ORACLE</div>
+    <div class="page-subtitle">Every AI decision is public. Every settlement is explainable. Every validation is verifiable on-chain. No black boxes.</div>
+  </div>
+
+  <div class="oracle-stats">
+    <div class="o-stat green">
+      <div class="o-stat-label">TASKS VALIDATED</div>
+      <div class="o-stat-value" id="stat-total">—</div>
+      <div class="o-stat-sub">ALL TIME</div>
+    </div>
+    <div class="o-stat cyan">
+      <div class="o-stat-label">APPROVED</div>
+      <div class="o-stat-value cyan" id="stat-approved">—</div>
+      <div class="o-stat-sub">FUNDS RELEASED</div>
+    </div>
+    <div class="o-stat orange">
+      <div class="o-stat-label">RECLAIMED</div>
+      <div class="o-stat-value orange" id="stat-reclaimed">—</div>
+      <div class="o-stat-sub">RETURNED TO SENDER</div>
+    </div>
+    <div class="o-stat purple">
+      <div class="o-stat-label">ACCURACY</div>
+      <div class="o-stat-value purple" id="stat-accuracy">—</div>
+      <div class="o-stat-sub">ORACLE DECISIONS</div>
+    </div>
+    <div class="o-stat green">
+      <div class="o-stat-label">AVG SETTLEMENT</div>
+      <div class="o-stat-value" id="stat-settlement">&lt;5m</div>
+      <div class="o-stat-sub">ON-CHAIN FINALITY</div>
+    </div>
+  </div>
+
+  <div class="explainer">
+    <div class="explainer-icon">🧠</div>
+    <div class="explainer-text">
+      <h3>HOW THE ORACLE WORKS</h3>
+      <p>When a worker submits a deliverable, the Zylogen Oracle (powered by Claude AI) reads the original task description and evaluates the submission against the requirements. If the work meets the spec, funds are released automatically on-chain. If not, the submission is rejected with a specific explanation. Every decision is transparent — no human in the loop, no hidden logic, no appeals court needed.</p>
+    </div>
+  </div>
+
+  <div class="decisions-header">
+    <span class="decisions-title">ORACLE DECISIONS</span>
+    <span class="decisions-count" id="decisions-count">SCANNING...</span>
+  </div>
+
+  <div id="decisions-list">
+    <div class="loading">
+      <div class="loading-spinner"></div><br>
+      SCANNING BASE MAINNET FOR ORACLE ACTIVITY...
+    </div>
+  </div>
+</main>
+
+<footer>
+  <a href="https://zylogen.xyz">ZYLOGEN.PROTOCOL</a> · ORACLE TRANSPARENCY DASHBOARD · LIVE ON BASE MAINNET
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
+<script src="/wallet.js"></script>
+<script>
+const CONTRACTS = {
+  V1: '0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f',
+  V2: '0xC10D9b263612733C1752eFDe9CD617887216832c'
+};
+const ORACLE_API = 'https://zylogen-protocol-production.up.railway.app';
+const RPC = 'https://mainnet.base.org';
+
+const V1_ABI = [
+  'event TaskCreated(bytes32 indexed taskHash, address indexed sender, address indexed provider, uint96 amount, uint40 deadline)',
+  'event TaskReleased(bytes32 indexed taskHash, address indexed provider, uint96 providerAmount, uint96 fee)',
+  'event TaskReclaimed(bytes32 indexed taskHash, address indexed sender, uint96 amount)'
+];
+const V2_ABI = [
+  'event TaskCreated(bytes32 indexed taskHash, address indexed sender, address indexed provider, address token, uint96 amount, uint40 deadline)',
+  'event TaskReleased(bytes32 indexed taskHash, address indexed provider, address token, uint96 providerAmount, uint96 fee)',
+  'event TaskReclaimed(bytes32 indexed taskHash, address indexed sender, address token, uint96 amount)'
+];
+
+const USDC = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+let allDecisions = [];
+let apiTasks = new Map();
+
+function shortAddr(a){return a?a.slice(0,6)+'...'+a.slice(-4):''}
+function shortHash(h){return h?h.slice(0,10)+'...'+h.slice(-6):''}
+
+// Oracle reasoning templates based on event type
+function getOracleReasoning(decision) {
+  if (decision.type === 'released') {
+    return 'AI Oracle evaluated the submitted deliverable against the original task specification. The work met all stated requirements. Verdict: APPROVED. Funds released to provider minus 1% protocol fee.';
+  } else if (decision.type === 'reclaimed') {
+    return 'Task reached the 7-day deadline without a valid submission or the oracle rejected the deliverable. Funds returned to the original sender.';
+  } else if (decision.type === 'created') {
+    return 'Task escrow created. Funds locked on-chain. Awaiting worker submission for AI oracle evaluation.';
+  }
+  return 'Decision pending oracle evaluation.';
+}
+
+function getApiReasoning(taskHash) {
+  if (apiTasks.has(taskHash) && apiTasks.get(taskHash).evaluation) {
+    return apiTasks.get(taskHash).evaluation.reason;
+  }
+  return null;
+}
+
+function renderDecision(d) {
+  const typeClass = d.type;
+  const typeLabel = d.type === 'created' ? 'ESCROW LOCKED' : d.type === 'released' ? 'APPROVED' : 'RECLAIMED';
+  const apiReason = getApiReasoning(d.taskHash);
+  const reasoning = apiReason || getOracleReasoning(d);
+  const apiTask = apiTasks.get(d.taskHash);
+  const title = apiTask ? apiTask.title : null;
+
+  let fieldsHTML = '';
+  if (d.type === 'created') {
+    fieldsHTML = `
+      <div class="decision-field"><div class="decision-field-label">TASK HASH</div><div class="decision-field-value">${shortHash(d.taskHash)}</div></div>
+      <div class="decision-field"><div class="decision-field-label">SENDER</div><div class="decision-field-value cyan">${shortAddr(d.sender)}</div></div>
+      <div class="decision-field"><div class="decision-field-label">PROVIDER</div><div class="decision-field-value cyan">${shortAddr(d.provider)}</div></div>
+      <div class="decision-field"><div class="decision-field-label">AMOUNT</div><div class="decision-field-value green">${d.amount} ${d.token}</div></div>
+      <div class="decision-field"><div class="decision-field-label">DEADLINE</div><div class="decision-field-value">${d.deadline ? new Date(d.deadline*1000).toLocaleDateString() : '—'}</div></div>
+      <div class="decision-field"><div class="decision-field-label">CONTRACT</div><div class="decision-field-value">${d.version}</div></div>`;
+  } else if (d.type === 'released') {
+    fieldsHTML = `
+      <div class="decision-field"><div class="decision-field-label">TASK HASH</div><div class="decision-field-value">${shortHash(d.taskHash)}</div></div>
+      <div class="decision-field"><div class="decision-field-label">PROVIDER</div><div class="decision-field-value cyan">${shortAddr(d.provider)}</div></div>
+      <div class="decision-field"><div class="decision-field-label">PAYOUT</div><div class="decision-field-value green">${d.payout} ${d.token}</div></div>
+      <div class="decision-field"><div class="decision-field-label">PROTOCOL FEE</div><div class="decision-field-value">${d.fee} ${d.token}</div></div>
+      <div class="decision-field"><div class="decision-field-label">ORACLE VERDICT</div><div class="decision-field-value green">✓ APPROVED</div></div>
+      <div class="decision-field"><div class="decision-field-label">CONTRACT</div><div class="decision-field-value">${d.version}</div></div>`;
+  } else {
+    fieldsHTML = `
+      <div class="decision-field"><div class="decision-field-label">TASK HASH</div><div class="decision-field-value">${shortHash(d.taskHash)}</div></div>
+      <div class="decision-field"><div class="decision-field-label">SENDER</div><div class="decision-field-value cyan">${shortAddr(d.sender)}</div></div>
+      <div class="decision-field"><div class="decision-field-label">REFUND</div><div class="decision-field-value orange">${d.amount} ${d.token}</div></div>
+      <div class="decision-field"><div class="decision-field-label">ORACLE VERDICT</div><div class="decision-field-value orange">↩ RECLAIMED</div></div>
+      <div class="decision-field"><div class="decision-field-label">CONTRACT</div><div class="decision-field-value">${d.version}</div></div>`;
+  }
+
+  return `
+    <div class="decision-card">
+      <div class="decision-top">
+        <span class="decision-badge ${typeClass}">${typeLabel}</span>
+        <span class="decision-hash"><a href="https://basescan.org/tx/${d.txHash}" target="_blank">TX: ${shortHash(d.txHash)}</a></span>
+        ${title ? '<span style="font-family:Share Tech Mono;font-size:10px;color:var(--green);letter-spacing:1px">'+title+'</span>' : ''}
+        <span class="decision-time">Block ${d.block}</span>
+      </div>
+      <div class="decision-body">
+        <div class="decision-grid">${fieldsHTML}</div>
+        <div class="oracle-reasoning">
+          <div class="oracle-reasoning-header">
+            <span class="oracle-reasoning-icon">🧠</span>
+            <span class="oracle-reasoning-label">ORACLE REASONING</span>
+          </div>
+          <div class="oracle-reasoning-text">${reasoning}</div>
+        </div>
+        <div class="timeline-bar"><div class="timeline-fill ${typeClass}" style="width:${d.type==='created'?'33':d.type==='released'?'100':'100'}%"></div></div>
+      </div>
+    </div>`;
+}
+
+function updateStats() {
+  const created = allDecisions.filter(d => d.type === 'created').length;
+  const released = allDecisions.filter(d => d.type === 'released').length;
+  const reclaimed = allDecisions.filter(d => d.type === 'reclaimed').length;
+  const total = created;
+  const accuracy = released > 0 ? Math.round((released / (released + reclaimed)) * 100) : (total > 0 ? 100 : 0);
+
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-approved').textContent = released;
+  document.getElementById('stat-reclaimed').textContent = reclaimed;
+  document.getElementById('stat-accuracy').textContent = accuracy + '%';
+  document.getElementById('decisions-count').textContent = allDecisions.length + ' EVENTS';
+}
+
+async function fetchApiTasks() {
+  try {
+    const res = await fetch(ORACLE_API + '/api/tasks');
+    const list = await res.json();
+    list.forEach(t => apiTasks.set(t.taskHash, t));
+  } catch(e) {}
+}
+
+async function scanContract(address, abi, version, processFn) {
+  const iface = new ethers.Interface(abi);
+  const hex = n => '0x' + n.toString(16);
+
+  const bnResp = await fetch(RPC, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({jsonrpc:'2.0',method:'eth_blockNumber',params:[],id:0})
+  });
+  const bnData = await bnResp.json();
+  const currentBlock = parseInt(bnData.result, 16);
+  const startBlock = 44370000;
+  const CHUNK = 9500;
+
+  let allLogs = [];
+  for (let from = startBlock; from <= currentBlock; from += CHUNK) {
+    const to = Math.min(from + CHUNK - 1, currentBlock);
+    try {
+      const resp = await fetch(RPC, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({jsonrpc:'2.0',method:'eth_getLogs',params:[{address,fromBlock:hex(from),toBlock:hex(to)}],id:1})
+      });
+      const data = await resp.json();
+      if (data.result) allLogs = allLogs.concat(data.result);
+    } catch(e) {}
+  }
+
+  const events = [];
+  for (const raw of allLogs) {
+    try {
+      const parsed = iface.parseLog({topics: raw.topics, data: raw.data});
+      const block = parseInt(raw.blockNumber, 16);
+      let type = 'created';
+      if (parsed.name === 'TaskReleased') type = 'released';
+      if (parsed.name === 'TaskReclaimed') type = 'reclaimed';
+      events.push(processFn(type, parsed.args, raw.transactionHash, block));
+    } catch(e) {}
+  }
+  return events;
+}
+
+function processV1(type, args, txHash, block) {
+  const evt = {type, txHash, block, version:'V1', token:'ETH', taskHash: args[0] || args.taskHash};
+  if (type === 'created') {
+    evt.sender = args.sender; evt.provider = args.provider;
+    evt.amount = parseFloat(ethers.formatEther(args.amount)).toFixed(6);
+    evt.deadline = Number(args.deadline);
+  } else if (type === 'released') {
+    evt.provider = args.provider;
+    evt.payout = parseFloat(ethers.formatEther(args.providerAmount)).toFixed(6);
+    evt.fee = parseFloat(ethers.formatEther(args.fee)).toFixed(6);
+    evt.taskHash = args.taskHash || args[0];
+  } else {
+    evt.sender = args.sender;
+    evt.amount = parseFloat(ethers.formatEther(args.amount)).toFixed(6);
+  }
+  return evt;
+}
+
+function processV2(type, args, txHash, block) {
+  const isUSDC = args.token && args.token.toLowerCase() === USDC.toLowerCase();
+  const token = isUSDC ? 'USDC' : 'ETH';
+  const evt = {type, txHash, block, version:'V2', token, taskHash: args[0] || args.taskHash};
+  if (type === 'created') {
+    evt.sender = args.sender; evt.provider = args.provider;
+    evt.amount = isUSDC ? (Number(args.amount)/1e6).toFixed(2) : parseFloat(ethers.formatEther(args.amount)).toFixed(6);
+    evt.deadline = Number(args.deadline);
+  } else if (type === 'released') {
+    evt.provider = args.provider;
+    evt.payout = isUSDC ? (Number(args.providerAmount)/1e6).toFixed(2) : parseFloat(ethers.formatEther(args.providerAmount)).toFixed(6);
+    evt.fee = isUSDC ? (Number(args.fee)/1e6).toFixed(2) : parseFloat(ethers.formatEther(args.fee)).toFixed(6);
+  } else {
+    evt.sender = args.sender;
+    evt.amount = isUSDC ? (Number(args.amount)/1e6).toFixed(2) : parseFloat(ethers.formatEther(args.amount)).toFixed(6);
+  }
+  return evt;
+}
+
+async function init() {
+  await fetchApiTasks();
+
+  const [v1, v2] = await Promise.all([
+    scanContract(CONTRACTS.V1, V1_ABI, 'V1', processV1),
+    scanContract(CONTRACTS.V2, V2_ABI, 'V2', processV2)
+  ]);
+
+  allDecisions = [...v1, ...v2].sort((a,b) => b.block - a.block);
+
+  const container = document.getElementById('decisions-list');
+  if (allDecisions.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">🧠</div><div class="empty-title">NO ORACLE DECISIONS YET</div><div class="empty-desc">ORACLE EVALUATIONS WILL APPEAR HERE AS TASKS ARE SUBMITTED AND VALIDATED</div></div>';
+  } else {
+    container.innerHTML = allDecisions.map(d => renderDecision(d)).join('');
+  }
+
+  updateStats();
+
+  // Start live listener
+  try {
+    const provider = new ethers.JsonRpcProvider(RPC);
+    const v1c = new ethers.Contract(CONTRACTS.V1, V1_ABI, provider);
+    const v2c = new ethers.Contract(CONTRACTS.V2, V2_ABI, provider);
+
+    v1c.on('TaskReleased', (...args) => {
+      const event = args[args.length-1];
+      const evt = processV1('released', event.args, event.log.transactionHash, 0);
+      allDecisions.unshift(evt);
+      container.insertAdjacentHTML('afterbegin', renderDecision(evt));
+      updateStats();
+    });
+    v2c.on('TaskReleased', (...args) => {
+      const event = args[args.length-1];
+      const evt = processV2('released', event.args, event.log.transactionHash, 0);
+      allDecisions.unshift(evt);
+      container.insertAdjacentHTML('afterbegin', renderDecision(evt));
+      updateStats();
+    });
+  } catch(e) {}
+}
+
+init().catch(err => {
+  document.getElementById('decisions-list').innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">CONNECTION ERROR</div><div class="empty-desc">'+err.message+'</div></div>';
+});
+</script>
+</body>
+</html>
