@@ -5,6 +5,7 @@ const express    = require('express');
 const cors       = require('cors');
 const { ethers } = require('ethers');
 const Anthropic  = require('@anthropic-ai/sdk');
+const { OpenAI } = require('openai');
 const { Pool }   = require('pg');
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -14,6 +15,7 @@ const CONTRACT_ADDRESS = '0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f';
 const BASE_MAINNET_RPC = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
 const ORACLE_PRIVATE_KEY = process.env.ORACLE_PRIVATE_KEY;
 const ANTHROPIC_API_KEY  = process.env.ANTHROPIC_API_KEY;
+const OPENAI_API_KEY     = process.env.OPENAI_API_KEY; 
 const DATABASE_URL       = process.env.DATABASE_URL;
 
 const ABI = [
@@ -35,6 +37,7 @@ const rpcProvider = new ethers.JsonRpcProvider(BASE_MAINNET_RPC);
 const wallet      = new ethers.Wallet(ORACLE_PRIVATE_KEY, rpcProvider);
 const contract    = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
 const claude      = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+const openai      = new OpenAI({ apiKey: OPENAI_API_KEY }); 
 
 // ── PostgreSQL ────────────────────────────────────────────────────────────────
 
@@ -166,7 +169,7 @@ app.get('/health', async (req, res) => {
   res.json({ status: 'ok', tasks: count, uptime: process.uptime(), db: 'postgresql' });
 });
 
-// Register task description (called by frontend after lock())
+// Register task description
 app.post('/api/tasks', async (req, res) => {
   const { taskHash, title, description, sender, provider: prov } = req.body;
   if (!taskHash || !title || !description) {
@@ -214,7 +217,7 @@ app.post('/api/tasks/:taskHash/submit', async (req, res) => {
   };
 
   await dbUpdateTask(taskHash, { status: 'submitted', submission });
-  console.log(`[api] Submission received for ${taskHash} — evaluating with Claude...`);
+  console.log(`[api] Submission received for ${taskHash} — evaluating with 5-Agent Jury...`);
 
   // Trigger async evaluation
   evaluateSubmission(taskHash).catch(err => {
@@ -237,66 +240,130 @@ app.get('/api/tasks', async (req, res) => {
   res.json(list);
 });
 
-// ── Content Evaluation with Claude ────────────────────────────────────────────
+// ── Security Middleware ───────────────────────────────────────────────────────
+
+function sanitizeInput(text) {
+  if (!text) return "";
+  
+  // 1. Strip HTML/Script tags
+  let cleanText = text.replace(/<(script|iframe|object|embed|form)[^>]*>[\s\S]*?<\/\1>/gi, '');
+  
+  // 2. Neutralize known prompt injection vectors
+  const injectionPatterns = [
+    /ignore all previous instructions/gi,
+    /ignore previous instructions/gi,
+    /system prompt/gi,
+    /you must output APPROVE/gi,
+    /disregard/gi,
+    /override/gi
+  ];
+  
+  injectionPatterns.forEach(regex => {
+    cleanText = cleanText.replace(regex, '[REDACTED_MALICIOUS_INPUT]');
+  });
+  
+  return cleanText.trim();
+}
+
+// ── Content Evaluation with 5-Agent Jury ──────────────────────────────────────
 
 async function evaluateSubmission(taskHash) {
   const task = await dbGetTask(taskHash);
   if (!task || !task.submission) return;
 
   await dbUpdateTask(taskHash, { status: 'evaluating' });
-  console.log(`[oracle] Evaluating submission for "${task.title}"...`);
+  console.log(`[oracle] Commencing 5-Agent Jury evaluation for "${task.title}"...`);
 
-  const prompt = `You are an AI oracle that validates task completion for an escrow payment system.
+  const sanitizedContent = sanitizeInput(task.submission.content);
+
+  const basePrompt = `You are an AI oracle that validates task completion for an escrow payment system.
 
 TASK POSTED BY CLIENT:
   Title: ${task.title}
   Description: ${task.description}
 
 WORK SUBMITTED BY PROVIDER:
-${task.submission.content}
+${sanitizedContent}
 
 EVALUATION CRITERIA:
-1. Does the submitted work match what was requested in the task description?
-2. Is the work substantive and not empty/placeholder content?
-3. Does the quality meet a reasonable standard for the task?
-4. Is the submission relevant to the task title and description?
+1. Does the submitted work match what was requested?
+2. Is the work substantive?
+3. Does the quality meet a reasonable standard?
+4. Is the submission relevant?
 
-You are protecting the client's money. Only approve if the work genuinely fulfills the task requirements.
-If the submission is empty, irrelevant, low-effort, or does not match the description, reject it.
-
-Respond with exactly one word first: APPROVE or REJECT
-Then on the same line after a dash, give a brief reason (max 50 words).
-
-Examples:
-APPROVE - The blog post covers AI agents thoroughly, includes 500+ words, and addresses all requirements.
-REJECT - The submission is only 2 sentences and does not meet the 500-word requirement.
-REJECT - The submitted content is about cooking, not AI agents as requested.`;
+Respond with exactly one word first: APPROVE or REJECT.
+Then on the same line after a dash, give a brief reason.`;
 
   try {
-    const response = await claude.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 256,
-      messages: [{ role: 'user', content: prompt }],
+    const juryPromises = [
+      // Agent 1: Claude Sonnet
+      claude.messages.create({
+        model: 'claude-3-5-sonnet-20240620',
+        max_tokens: 256,
+        messages: [{ role: 'user', content: basePrompt }]
+      }).then(res => res.content[0].text),
+      
+      // Agent 2: Claude Haiku
+      claude.messages.create({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 256,
+        messages: [{ role: 'user', content: basePrompt }]
+      }).then(res => res.content[0].text),
+      
+      // Agent 3: Claude Sonnet (Strict)
+      claude.messages.create({
+        model: 'claude-3-5-sonnet-20240620',
+        max_tokens: 256,
+        messages: [{ role: 'user', content: basePrompt + " Be exceptionally strict." }]
+      }).then(res => res.content[0].text),
+
+      // Agent 4: GPT-4o
+      openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: basePrompt }],
+        max_tokens: 256
+      }).then(res => res.choices[0].message.content),
+
+      // Agent 5: GPT-4o-mini
+      openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: basePrompt }],
+        max_tokens: 256
+      }).then(res => res.choices[0].message.content)
+    ];
+
+    const results = await Promise.allSettled(juryPromises);
+    
+    let approveVotes = 0;
+    let rejectVotes = 0;
+    const voteLog = [];
+
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        const text = result.value.trim();
+        const vote = text.toUpperCase().startsWith('APPROVE') ? 'APPROVE' : 'REJECT';
+        vote === 'APPROVE' ? approveVotes++ : rejectVotes++;
+        voteLog.push(`Agent ${index + 1}: ${vote} - ${text.split('-')[1]?.trim() || 'No reason'}`);
+      } else {
+        console.error(`[oracle] Agent ${index + 1} failed:`, result.reason);
+        rejectVotes++;
+        voteLog.push(`Agent ${index + 1}: FAILED`);
+      }
     });
 
-    const text = response.content
-      .filter(b => b.type === 'text')
-      .map(b => b.text)
-      .join('')
-      .trim();
-
-    const approved = text.toUpperCase().startsWith('APPROVE');
+    const approved = approveVotes >= 3;
+    console.log(`[oracle] Jury Verdict for "${task.title}": ${approveVotes} APPROVE / ${rejectVotes} REJECT`);
+    voteLog.forEach(log => console.log(`  -> ${log}`));
 
     const evaluation = {
       approved,
-      reason: text,
+      approveVotes,
+      rejectVotes,
+      details: voteLog,
       evaluatedAt: new Date().toISOString()
     };
 
-    console.log(`[oracle] Claude evaluation for "${task.title}": ${text}`);
-
     if (approved) {
-      // Check if escrow still exists on-chain before releasing
       try {
         const escrow = await contract.escrows(taskHash);
         if (BigInt(escrow.amount) === 0n) {
@@ -315,7 +382,7 @@ REJECT - The submitted content is about cooking, not AI agents as requested.`;
       console.log(`[oracle] Task "${task.title}" REJECTED — funds remain in escrow`);
     }
   } catch (err) {
-    console.error(`[oracle] Claude evaluation error:`, err.message);
+    console.error(`[oracle] Jury evaluation error:`, err.message);
     await dbUpdateTask(taskHash, { status: 'open', submission: null });
   }
 }
@@ -350,7 +417,6 @@ async function handleTaskCreated(taskHash, sender, provider_, amount, deadline, 
   const existing = await dbGetTask(taskHash);
 
   if (existing) {
-    // Update with on-chain data
     await dbUpdateTask(taskHash, {
       amount: ethers.formatEther(amount),
       deadline: new Date(Number(deadline) * 1000).toISOString(),
@@ -359,7 +425,6 @@ async function handleTaskCreated(taskHash, sender, provider_, amount, deadline, 
     });
     console.log(`[oracle] Task "${existing.title}" confirmed on-chain — waiting for worker submission`);
   } else {
-    // Task created directly via contract (not through our UI)
     await dbCreateTask({
       taskHash,
       title: 'Direct Contract Task',
@@ -379,23 +444,15 @@ async function handleTaskCreated(taskHash, sender, provider_, amount, deadline, 
       console.log(`[oracle] Task registered via API — waiting for worker submission`);
       return;
     }
-    console.log(`[oracle] No API registration — treating as direct contract task`);
-
-    // For direct contract tasks without descriptions, do basic validation and release
-    const nowMs = Date.now();
-    const deadlineMs = Number(deadline) * 1000;
-    if (deadlineMs > nowMs && BigInt(amount.toString()) > 0n && sender !== provider_) {
-      console.log(`[oracle] Direct task passes basic validation — auto-releasing`);
-      const txHash = await releaseTask(taskHash);
-      await dbUpdateTask(taskHash, { status: 'released', txHash });
-    }
+    
+    // PATCHED: Zero-day drain exploit removed.
+    console.log(`[oracle] Direct task registered. Awaiting manual API description sync before evaluation.`);
   }
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  // Initialize database
   await initDB();
   console.log('[oracle] PostgreSQL connected (Neon.tech)');
 
@@ -406,24 +463,15 @@ async function main() {
   console.log(`[oracle] Oracle wallet  : ${oracleAddress}`);
   console.log(`[oracle] Contract       : ${CONTRACT_ADDRESS}`);
   console.log(`[oracle] API server     : port ${PORT}`);
-  console.log(`[oracle] Mode           : CONTENT EVALUATION + POSTGRESQL`);
+  console.log(`[oracle] Mode           : MULTI-AGENT JURY + POSTGRESQL`);
   console.log(`[oracle] Listening for TaskCreated events...`);
 
-  // Listen for on-chain events
   contract.on('TaskCreated', handleTaskCreated);
 
-  // Start API server
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`[oracle] API ready at http://0.0.0.0:${PORT}`);
-    console.log(`[oracle] Endpoints:`);
-    console.log(`         POST /api/tasks              — register task description`);
-    console.log(`         POST /api/tasks/:hash/submit  — submit work for evaluation`);
-    console.log(`         GET  /api/tasks/:hash         — get task status`);
-    console.log(`         GET  /api/tasks               — list all tasks`);
-    console.log(`         GET  /health                  — health check`);
   });
 
-  // Heartbeat
   setInterval(async () => {
     const count = await dbCountTasks().catch(() => '?');
     console.log(`[oracle] Heartbeat — ${new Date().toISOString()} — ${count} tasks in DB`);
