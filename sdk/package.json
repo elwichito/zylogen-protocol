@@ -1,7 +1,7 @@
 {
   "name": "zylogen-sdk",
-  "version": "2.0.0",
-  "description": "JavaScript SDK for Zylogen Protocol — AI-validated escrow on Base L2",
+  "version": "2.1.1",
+  "description": "JavaScript SDK + CLI for Zylogen Protocol \u2014 AI-validated escrow on Base L2",
   "main": "index.js",
   "keywords": [
     "zylogen",
@@ -27,7 +27,14 @@
   "engines": {
     "node": ">=18"
   },
-  "dependencies": {
-    "zylogen-sdk": "^2.0.0"
-  }
+  "dependencies": {},
+  "bin": {
+    "zylogen": "cli.js",
+    "zylogen-sdk": "cli.js"
+  },
+  "files": [
+    "index.js",
+    "cli.js",
+    "README.md"
+  ]
 }
