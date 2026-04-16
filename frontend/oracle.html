@@ -157,9 +157,9 @@ footer a{color:var(--green);text-decoration:none}
       <div class="o-stat-sub">RETURNED TO SENDER</div>
     </div>
     <div class="o-stat purple">
-      <div class="o-stat-label">ACCURACY</div>
+      <div class="o-stat-label">APPROVAL RATE</div>
       <div class="o-stat-value purple" id="stat-accuracy">—</div>
-      <div class="o-stat-sub">ORACLE DECISIONS</div>
+      <div class="o-stat-sub">APPROVED VS REJECTED</div>
     </div>
     <div class="o-stat green">
       <div class="o-stat-label">AVG SETTLEMENT</div>
@@ -297,16 +297,24 @@ function renderDecision(d) {
 }
 
 function updateStats() {
-  const created = allDecisions.filter(d => d.type === 'created').length;
-  const released = allDecisions.filter(d => d.type === 'released').length;
-  const reclaimed = allDecisions.filter(d => d.type === 'reclaimed').length;
-  const total = created;
-  const accuracy = released > 0 ? Math.round((released / (released + reclaimed)) * 100) : (total > 0 ? 100 : 0);
+  // Count ALL oracle decisions (on-chain + API evaluations)
+  const allEvaluations = Array.from(apiTasks.values()).filter(t => t.evaluation);
+  const apiApproved = allEvaluations.filter(t => t.evaluation.approved).length;
+  const apiRejected = allEvaluations.filter(t => !t.evaluation.approved).length;
 
-  document.getElementById('stat-total').textContent = total;
-  document.getElementById('stat-approved').textContent = released;
-  document.getElementById('stat-reclaimed').textContent = reclaimed;
-  document.getElementById('stat-accuracy').textContent = accuracy + '%';
+  const onChainReleased = allDecisions.filter(d => d.type === 'released' && d.version !== 'API').length;
+  const onChainReclaimed = allDecisions.filter(d => d.type === 'reclaimed' && d.version !== 'API').length;
+  const onChainCreated = allDecisions.filter(d => d.type === 'created' && d.version !== 'API').length;
+
+  const totalApproved = apiApproved + onChainReleased;
+  const totalRejected = apiRejected + onChainReclaimed;
+  const totalDecisions = totalApproved + totalRejected;
+  const approvalRate = totalDecisions > 0 ? Math.round((totalApproved / totalDecisions) * 100) : 0;
+
+  document.getElementById('stat-total').textContent = Math.max(onChainCreated, totalDecisions);
+  document.getElementById('stat-approved').textContent = totalApproved;
+  document.getElementById('stat-reclaimed').textContent = totalRejected;
+  document.getElementById('stat-accuracy').textContent = totalDecisions > 0 ? approvalRate + '%' : '—';
   document.getElementById('decisions-count').textContent = allDecisions.length + ' EVENTS';
 }
 
