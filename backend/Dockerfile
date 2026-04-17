@@ -12,11 +12,14 @@ WORKDIR /app
 # volume is attached. Railway overlays this directory when the volume is mounted.
 RUN mkdir -p /data
 
-COPY package.json ./
+# Paths are relative to the repo root (Railway build context).
+# If Railway is configured with Root Directory = backend/, change these to:
+#   COPY package.json ./  /  COPY src/ ./src/  /  COPY scripts/ ./scripts/
+COPY backend/package.json ./
 RUN npm install --omit=dev
 
-COPY src/ ./src/
-COPY scripts/ ./scripts/
+COPY backend/src/ ./src/
+COPY backend/scripts/ ./scripts/
 
 # /data is the Railway persistent volume mount point.
 # Set DB_PATH=/data/nova.db in Railway environment variables.
