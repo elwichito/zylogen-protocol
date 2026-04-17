@@ -1,0 +1,6 @@
+node_modules
+.env
+nova.db
+nova.db-shm
+nova.db-wal
+*.log

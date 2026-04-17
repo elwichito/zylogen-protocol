@@ -1,21 +1,27 @@
-node_modules
+node_modules/
 .env
+.env.local
 .env.*
 
-# Hardhat files
-/cache
-/artifacts
+# SQLite — Railway uses /data volume; never commit the local DB
+backend/nova.db
+backend/nova.db-shm
+backend/nova.db-wal
 
-# TypeChain files
-/typechain
-/typechain-types
+# Build output
+dist/
+build/
+.next/
+*.tsbuildinfo
 
-# solidity-coverage files
-/coverage
-/coverage.json
-
-# Hardhat Ignition default folder for deployments against a local node
+# Hardhat / Solidity
+artifacts/
+cache/
+typechain/
+typechain-types/
+coverage/
+coverage.json
 ignition/deployments/chain-31337
-.env
+
+# Vercel
 .vercel
-.env*.local
