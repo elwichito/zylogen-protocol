@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "dev": "nodemon src/index.js",
-    "start": "node backend/src/index.js",
+    "start": "node src/index.js",
     "test:webhook": "DRY_RUN=true node scripts/test-webhook.js",
     "test:preflight": "node scripts/test-webhook.js"
   },
