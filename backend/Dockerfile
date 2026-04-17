@@ -23,8 +23,6 @@ COPY backend/scripts/ ./scripts/
 
 # /data is the Railway persistent volume mount point.
 # Set DB_PATH=/data/nova.db in Railway environment variables.
-# Without the volume, nova.db is ephemeral and lost on restart.
-VOLUME ["/data"]
 
 EXPOSE 3001
 
