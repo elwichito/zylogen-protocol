@@ -8,6 +8,10 @@ RUN apt-get update && \
 
 WORKDIR /app
 
+# Ensure /data exists at build time so the app starts even before the Railway
+# volume is attached. Railway overlays this directory when the volume is mounted.
+RUN mkdir -p /data
+
 COPY package.json ./
 RUN npm install --omit=dev
 
