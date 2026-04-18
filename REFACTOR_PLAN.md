@@ -79,4 +79,57 @@ Items flagged for cleanup. None of these block the current sprint. Resolve post-
 
 ---
 
+## Session Checkpoint — 2026-04-18 (Late)
+
+### Completed Today
+- Railway backend live (GREEN): zylogen-protocol-production.up.railway.app
+- Infrastructure fixes: duplicate Dockerfile removed, lock file synced, custom start command cleared, STRIPE_WEBHOOK_SECRET added
+- Oracle wallet funded: 10.21 USDC + 0.003 ETH on Base Mainnet
+- Architectural discovery: V1 contract uses ETH, relay uses USDC — mismatch identified
+- TaskEscrowV2.sol written (USDC native, 1% fee, ReentrancyGuard, Pausable, Ownable)
+- 24/24 unit tests passing, gas within limits (lock 138k, release 58k)
+- Team workflow formalized in TEAM_WORKFLOW.md
+
+### Partial Settlement on Mainnet
+- First `approve()` of USDC executed on-chain via Relayer (0x24A4...D849)
+- `lock()` reverted due to V1/V2 ABI mismatch (expected; drove the V2 decision)
+- Zero funds lost
+
+### Next Session — Resume Here
+
+**Blocking items for Wichi (before Zyl can continue):**
+1. Add `DEPLOYER_PRIVATE_KEY` (MetaMask 0x8bcB...3693e) to `backend/.env`
+2. Add `BASESCAN_API_KEY` to `backend/.env` (register at basescan.org/register)
+3. Top-up Sepolia ETH to 0x8bcB...3693e (~0.05 ETH via coinbase.com/faucets/base-ethereum-sepolia-faucet)
+
+**Zyl tasks once Wichi unblocks:**
+4. Write scripts/deploy-v2-sepolia.js
+5. Deploy V2 to Base Sepolia, verify on BaseScan
+6. Run test:preflight against Sepolia (expect tx hash)
+7. CTO checkpoint review
+8. Deploy V2 to Base Mainnet, verify on BaseScan
+9. Update TASK_ESCROW_ADDRESS in Railway variables
+10. Update paymentRelay.js ABI for new lock() signature: lock(bytes32 taskId, address worker, uint256 amount, uint256 deadline)
+11. Railway redeploy verification (GREEN)
+12. Execute test:preflight against Mainnet V2 → TX HASH 🎯
+
+### Security Debt (P0 — before any public user onboarding)
+- Migrate contract ownership from MetaMask hot wallet to Gnosis Safe multisig
+- Audit seed phrase storage (ensure paper backup, remove digital copies)
+- Consider rotating RELAYER_PRIVATE_KEY post-V2 deploy
+
+### NOVA Product Integration (OUT OF SCOPE)
+- NOVA = AI Business Worker (end product)
+- Zylogen Protocol = settlement infrastructure (what we're building)
+- Sequence: complete Zylogen V2 on Mainnet FIRST, then NOVA integrates on top
+- Attempting both in parallel = context fragmentation, scope creep
+- Architect directive (Logen): "Forget NOVA for this sprint"
+
+### Architecture Decision Records
+- ADR-001: Token standard = USDC (ERC-20). Approved unanimously.
+- ADR-002: Contract V1 (0x55a8...451f) = deprecated proof-of-concept. V2 canonical.
+- ADR-003: Deployer-as-owner acceptable for MVP, migrate to multisig pre-launch.
+
+---
+
 *Maintained by Zyl. Last updated: 2026-04-18.*
