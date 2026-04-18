@@ -8,7 +8,7 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "test:webhook": "DRY_RUN=true node scripts/test-webhook.js",
-    "test:preflight": "node scripts/test-webhook.js"
+    "test:preflight": "node backend/scripts/test-webhook.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
