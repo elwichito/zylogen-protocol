@@ -12,11 +12,7 @@
  *   4. Relayer approves USDC transfer, then calls TaskEscrow.lock()
  *   5. Persist result + increment scarcity counter
  *
- * Contract: TaskEscrow @ 0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f (Base Mainnet)
- * KNOWN BLOCKER: Relayer wallet needs ETH for gas before this can execute on-chain.
- *
- * NOTE: lock() ABI below assumes the deployed interface — adjust if your
- * actual function signature differs (check Basescan for the verified ABI).
+ * Contract: TaskEscrowV2 @ 0xBE464859Fb6f09fa93b6212f616F3AD19ebe48B1 (Base Mainnet)
  */
 
 const Stripe = require("stripe");
@@ -36,7 +32,7 @@ function getStripe() {
 // ─── Chain config ─────────────────────────────────────────────────────────────
 
 const TASK_ESCROW_ADDRESS = process.env.TASK_ESCROW_ADDRESS
-  || "0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f";
+  || "0xBE464859Fb6f09fa93b6212f616F3AD19ebe48B1";
 
 // USDC on Base Mainnet: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
 // USDC on Base Sepolia: 0x036CbD53842c5426634e7929541eC2318f3dCF7e
@@ -52,12 +48,26 @@ const ERC20_ABI = [
   "function allowance(address owner, address spender) external view returns (uint256)",
 ];
 
-// TaskEscrow ABI — lock() confirmed by Logen; releaseFunds() matches deployed interface
+// TaskEscrowV2 ABI — verified at 0xBE464859Fb6f09fa93b6212f616F3AD19ebe48B1
 const ESCROW_ABI = [
-  "function lock(address client, uint256 amount) external returns (uint256 taskId)",
-  "function releaseFunds(uint256 escrowId, address worker) external",
-  "event Locked(uint256 indexed taskId, address indexed client, uint256 amount)",
+  "function lock(bytes32 taskId, address worker, uint256 amount, uint256 deadline) external",
+  "function release(bytes32 taskId) external",
+  "function refund(bytes32 taskId) external",
+  "event TaskLocked(bytes32 indexed taskId, address indexed client, address indexed worker, uint256 amount, uint256 deadline)",
 ];
+
+// 24-hour deadline for each task
+const DEADLINE_SECONDS = 24 * 3600;
+
+// Deterministic taskId from Stripe session + client wallet + timestamp
+function generateTaskId(stripeSessionId, clientAddress, timestamp) {
+  return ethers.keccak256(
+    ethers.solidityPacked(
+      ["string", "address", "uint256"],
+      [stripeSessionId, clientAddress, timestamp]
+    )
+  );
+}
 
 // ─── Provider + relayer ───────────────────────────────────────────────────────
 
@@ -123,24 +133,14 @@ async function relayPaymentToEscrow(clientAddress, customerEmail, stripeSessionI
     console.log(`[paymentRelay] USDC approved for ${TASK_ESCROW_ADDRESS}`);
   }
 
-  // 2. Call lock()
-  const tx = await escrow.lock(clientAddress, USDC_LOCK_AMOUNT);
-  const receipt = await tx.wait();
+  // 2. Generate deterministic taskId and deadline
+  const timestamp = Math.floor(Date.now() / 1000);
+  const taskId  = generateTaskId(stripeSessionId, clientAddress, timestamp);
+  const deadline = timestamp + DEADLINE_SECONDS;
 
-  // 3. Parse taskId from Locked event (best-effort — falls back to tx hash)
-  const iface = new ethers.Interface(ESCROW_ABI);
-  let taskId = null;
-  for (const log of receipt.logs) {
-    try {
-      const parsed = iface.parseLog(log);
-      if (parsed?.name === "Locked") {
-        taskId = parsed.args.taskId.toString();
-        break;
-      }
-    } catch (_) { /* not our event */ }
-  }
-  // If the deployed contract emits no events, use the tx hash as the task reference
-  if (!taskId) taskId = receipt.hash;
+  // 3. Call lock() — relayer is msg.sender (client in Task struct), clientAddress is worker
+  const tx = await escrow.lock(taskId, clientAddress, USDC_LOCK_AMOUNT, deadline);
+  const receipt = await tx.wait();
 
   // 4. Persist to SQLite
   db.prepare(`
@@ -180,8 +180,8 @@ async function releasePayment(escrowId, email) {
     return { released: true, dryRun: true };
   }
 
-  // Skip if escrowId is a tx hash fallback (no on-chain task ID available)
-  if (!escrowId || escrowId.startsWith("0x") || escrowId.startsWith("DRY-")) {
+  // Skip if escrowId is a mock from DRY_RUN
+  if (!escrowId || escrowId.startsWith("DRY-")) {
     console.warn(`[paymentRelay] releasePayment skipped — escrowId is a tx hash or mock: ${escrowId}`);
     db.prepare(`
       UPDATE escrow_records SET status = 'released' WHERE client_email = ? AND escrow_id = ?
@@ -192,7 +192,7 @@ async function releasePayment(escrowId, email) {
   const relayer = getRelayer();
   const escrow  = new ethers.Contract(TASK_ESCROW_ADDRESS, ESCROW_ABI, relayer);
 
-  const tx      = await escrow.releaseFunds(BigInt(escrowId), relayer.address);
+  const tx      = await escrow.release(escrowId);
   const receipt = await tx.wait();
 
   db.prepare(`
