@@ -3,7 +3,7 @@ import { useWeb3Modal, useWeb3ModalAccount, useWeb3ModalProvider } from '@web3mo
 import { BrowserProvider, Contract, parseEther, isAddress, hexlify, toUtf8Bytes, zeroPadValue } from 'ethers'
 import './App.css'
 
-const CONTRACT_ADDRESS = '0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f'
+const CONTRACT_ADDRESS = '0xBE464859Fb6f09fa93b6212f616F3AD19ebe48B1'
 const BASE_CHAIN_ID = 8453
 
 const ABI = [
