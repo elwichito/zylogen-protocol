@@ -108,7 +108,7 @@ export default function DashboardPage() {
         <span style={s.confirmText}>Payment confirmed on Base</span>
         {txHash && (
           <a
-            href={`https://sepolia.basescan.org/tx/${txHash}`}
+            href={`https://basescan.org/tx/${txHash}`}
             target="_blank"
             rel="noreferrer"
             style={s.txLink}
