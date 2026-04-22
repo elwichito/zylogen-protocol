@@ -138,8 +138,10 @@ async function relayPaymentToEscrow(clientAddress, customerEmail, stripeSessionI
   const taskId  = generateTaskId(stripeSessionId, clientAddress, timestamp);
   const deadline = timestamp + DEADLINE_SECONDS;
 
-  // 3. Call lock() — relayer is msg.sender (client in Task struct), clientAddress is worker
-  const tx = await escrow.lock(taskId, clientAddress, USDC_LOCK_AMOUNT, deadline);
+  // 3. Call lock() — relayer is msg.sender (client in Task struct), Nova wallet is worker
+  const workerAddress = process.env.NOVA_WORKER_ADDRESS;
+  if (!workerAddress) throw new Error("NOVA_WORKER_ADDRESS env var not set");
+  const tx = await escrow.lock(taskId, workerAddress, USDC_LOCK_AMOUNT, deadline);
   const receipt = await tx.wait();
 
   // 4. Persist to SQLite
