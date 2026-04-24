@@ -1,4 +1,3 @@
 {
-  "buildCommand": "echo skip",
-  "outputDirectory": "."
+  "framework": "nextjs"
 }
