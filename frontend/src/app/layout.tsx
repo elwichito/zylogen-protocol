@@ -26,10 +26,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
+        <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
         <style>{`
           *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
           html { font-size: 16px; -webkit-font-smoothing: antialiased; }
-          body { background: #080808; color: #e8e3dc; font-family: 'Georgia', serif; }
+          body { background: #0a0a0a; color: #c0c0c0; font-family: 'Rajdhani', system-ui, sans-serif; }
           a { color: inherit; text-decoration: none; }
         `}</style>
       </head>

@@ -143,7 +143,7 @@ export default function NovaPage() {
           {step === 0 && noMetaMask && (
             <p style={s.errNote}>
               MetaMask not detected.{" "}
-              <a href="https://metamask.io" target="_blank" rel="noreferrer" style={{ color: "#c9a96e" }}>
+              <a href="https://metamask.io" target="_blank" rel="noreferrer" style={{ color: "#00e5ff" }}>
                 Install it here →
               </a>
             </p>
@@ -241,12 +241,12 @@ function StepRow({ num, title, isActive, isComplete, isLocked, children }: {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "14px", opacity: isLocked ? 0.35 : 1, transition: "opacity 0.3s ease" }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: "12px" }}>
-        <span style={{ fontSize: "11px", letterSpacing: "0.12em", fontFamily: "system-ui,sans-serif", fontWeight: 600, minWidth: "20px",
-          color: isComplete ? "#4a7c59" : isActive ? "#c9a96e" : "#2a2a2a" }}>
+        <span style={{ fontSize: "11px", letterSpacing: "0.12em", fontFamily: "'Share Tech Mono',monospace", fontWeight: 600, minWidth: "20px",
+          color: isComplete ? "#00ff88" : isActive ? "#00e5ff" : "#2a2a2a" }}>
           {num}
         </span>
-        <h2 style={{ fontSize: "18px", fontWeight: 400, letterSpacing: "-0.01em",
-          color: isLocked ? "#2a2a2a" : isComplete ? "#4a4a4a" : "#e8e3dc" }}>
+        <h2 style={{ fontSize: "18px", fontWeight: 500, letterSpacing: "0.05em",
+          color: isLocked ? "#2a2a2a" : isComplete ? "#606060" : "#ffffff", fontFamily: "'Rajdhani',system-ui,sans-serif" }}>
           {title}
         </h2>
       </div>
@@ -258,32 +258,32 @@ function StepRow({ num, title, isActive, isComplete, isLocked, children }: {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s: Record<string, React.CSSProperties> = {
-  page:         { minHeight: "100vh", maxWidth: "560px", margin: "0 auto", padding: "0 24px 80px", display: "flex", flexDirection: "column" },
+  page:         { minHeight: "100vh", maxWidth: "560px", margin: "0 auto", padding: "0 24px 80px", display: "flex", flexDirection: "column", background: "#0a0a0a" },
   header:       { display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "32px", paddingBottom: "64px" },
-  wordmark:     { fontSize: "11px", letterSpacing: "0.22em", color: "#3a3a3a", fontFamily: "system-ui,sans-serif", fontWeight: 600 },
-  walletPill:   { fontSize: "11px", color: "#4a4a4a", fontFamily: "system-ui,sans-serif", letterSpacing: "0.08em", border: "1px solid #1e1e1e", padding: "4px 10px", borderRadius: "999px" },
+  wordmark:     { fontSize: "11px", letterSpacing: "0.22em", color: "#00ff88", fontFamily: "'Share Tech Mono',monospace", fontWeight: 600 },
+  walletPill:   { fontSize: "11px", color: "#00e5ff", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.08em", border: "1px solid rgba(0,229,255,0.3)", padding: "4px 10px", borderRadius: "999px" },
   hero:         { marginBottom: "48px" },
-  eyebrow:      { fontSize: "11px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#c9a96e", fontFamily: "system-ui,sans-serif", marginBottom: "20px" },
-  headline:     { fontSize: "clamp(36px,8vw,52px)", fontWeight: 400, lineHeight: 1.1, letterSpacing: "-0.02em", color: "#e8e3dc", marginBottom: "20px" },
-  accent:       { fontStyle: "italic", color: "#c9a96e" },
-  subline:      { fontSize: "15px", lineHeight: 1.7, color: "#6b6b6b", fontFamily: "system-ui,sans-serif", maxWidth: "420px" },
+  eyebrow:      { fontSize: "11px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#00e5ff", fontFamily: "'Share Tech Mono',monospace", marginBottom: "20px" },
+  headline:     { fontSize: "clamp(36px,8vw,52px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em", color: "#ffffff", marginBottom: "20px", fontFamily: "'Rajdhani',system-ui,sans-serif" },
+  accent:       { fontStyle: "italic", color: "#00e5ff" },
+  subline:      { fontSize: "15px", lineHeight: 1.7, color: "#808080", fontFamily: "'Rajdhani',system-ui,sans-serif", maxWidth: "420px" },
   scarcityWrap: { marginBottom: "40px" },
-  card:         { border: "1px solid #1a1a1a", borderRadius: "2px", padding: "36px", marginBottom: "64px", background: "#0d0d0d", display: "flex", flexDirection: "column", gap: "0" },
-  divider:      { height: "1px", background: "#141414", margin: "24px 0" },
-  primaryBtn:   { display: "block", width: "100%", padding: "14px 24px", background: "#c9a96e", color: "#080808", border: "none", borderRadius: "2px", fontSize: "13px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", fontFamily: "system-ui,sans-serif", textAlign: "center", transition: "opacity 0.2s ease" },
-  input:        { width: "100%", padding: "12px 14px", background: "#111", border: "1px solid #222", borderRadius: "2px", color: "#e8e3dc", fontSize: "14px", fontFamily: "system-ui,sans-serif", outline: "none" },
+  card:         { border: "1px solid #1a2a1a", borderRadius: "2px", padding: "36px", marginBottom: "64px", background: "#0d1a12", display: "flex", flexDirection: "column", gap: "0" },
+  divider:      { height: "1px", background: "#1a2a1a", margin: "24px 0" },
+  primaryBtn:   { display: "block", width: "100%", padding: "14px 24px", background: "#00e5ff", color: "#0a0a0a", border: "none", borderRadius: "2px", fontSize: "13px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Share Tech Mono',monospace", textAlign: "center", transition: "opacity 0.2s ease" },
+  input:        { width: "100%", padding: "12px 14px", background: "#0d1117", border: "1px solid #1a2a1a", borderRadius: "2px", color: "#c0c0c0", fontSize: "14px", fontFamily: "'Share Tech Mono',monospace", outline: "none" },
   priceRow:     { display: "flex", alignItems: "baseline", gap: "10px", flexWrap: "wrap" },
-  price:        { fontSize: "28px", fontWeight: 400, color: "#e8e3dc", letterSpacing: "-0.02em" },
-  priceSub:     { fontSize: "12px", color: "#4a4a4a", fontFamily: "system-ui,sans-serif", letterSpacing: "0.06em" },
-  priceBadge:   { fontSize: "9px", letterSpacing: "0.16em", background: "#1a1a0a", color: "#c9a96e", padding: "3px 7px", borderRadius: "2px", fontFamily: "system-ui,sans-serif", fontWeight: 600, border: "1px solid #2a2a10" },
-  completedNote:{ fontSize: "13px", color: "#4a7c59", fontFamily: "system-ui,sans-serif" },
-  lockedNote:   { fontSize: "12px", color: "#2a2a2a", fontFamily: "system-ui,sans-serif", letterSpacing: "0.06em" },
-  hint:         { fontSize: "12px", fontFamily: "system-ui,sans-serif", textAlign: "center" },
-  errNote:      { fontSize: "12px", color: "#ef4444", fontFamily: "system-ui,sans-serif" },
-  secNote:      { fontSize: "11px", color: "#2e2e2e", fontFamily: "system-ui,sans-serif", textAlign: "center" },
+  price:        { fontSize: "28px", fontWeight: 700, color: "#00e5ff", letterSpacing: "-0.02em", fontFamily: "'Rajdhani',system-ui,sans-serif" },
+  priceSub:     { fontSize: "12px", color: "#606060", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.06em" },
+  priceBadge:   { fontSize: "9px", letterSpacing: "0.16em", background: "rgba(0,229,255,0.05)", color: "#00e5ff", padding: "3px 7px", borderRadius: "2px", fontFamily: "'Share Tech Mono',monospace", fontWeight: 600, border: "1px solid rgba(0,229,255,0.2)" },
+  completedNote:{ fontSize: "13px", color: "#00ff88", fontFamily: "'Share Tech Mono',monospace" },
+  lockedNote:   { fontSize: "12px", color: "#2a2a2a", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.06em" },
+  hint:         { fontSize: "12px", fontFamily: "'Share Tech Mono',monospace", textAlign: "center" },
+  errNote:      { fontSize: "12px", color: "#ef4444", fontFamily: "'Share Tech Mono',monospace" },
+  secNote:      { fontSize: "11px", color: "#3a3a3a", fontFamily: "'Share Tech Mono',monospace", textAlign: "center" },
   features:     { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px 24px", marginBottom: "64px" },
   featureItem:  { display: "flex", flexDirection: "column", gap: "6px" },
-  featureTitle: { fontSize: "12px", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#3a3a3a", fontFamily: "system-ui,sans-serif" },
-  featureDesc:  { fontSize: "13px", lineHeight: 1.6, color: "#4a4a4a", fontFamily: "system-ui,sans-serif" },
-  footer:       { display: "flex", gap: "16px", fontSize: "11px", color: "#2a2a2a", fontFamily: "system-ui,sans-serif", letterSpacing: "0.08em", marginTop: "auto" },
+  featureTitle: { fontSize: "12px", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#00e5ff", fontFamily: "'Share Tech Mono',monospace" },
+  featureDesc:  { fontSize: "13px", lineHeight: 1.6, color: "#606060", fontFamily: "'Rajdhani',system-ui,sans-serif" },
+  footer:       { display: "flex", gap: "16px", fontSize: "11px", color: "#2a2a2a", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.08em", marginTop: "auto" },
 };

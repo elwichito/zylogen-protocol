@@ -50,7 +50,7 @@ export default function ScarcityCounter() {
     urgency === "sold_out" ? "#6b7280"
     : urgency === "critical" ? "#ef4444"
     : urgency === "low"      ? "#f59e0b"
-    : "#c9a96e"; // gold
+    : "#00e5ff"; // cyan
 
   const label =
     urgency === "loading"  ? "Checking availability…"
@@ -122,18 +122,18 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "11px",
     letterSpacing: "0.12em",
     textTransform: "uppercase",
-    fontFamily: "system-ui, sans-serif",
+    fontFamily: "'Share Tech Mono', monospace",
     fontWeight: 500,
   },
   claimed: {
     fontSize: "11px",
     color: "#4a4a4a",
-    fontFamily: "system-ui, sans-serif",
+    fontFamily: "'Share Tech Mono', monospace",
     letterSpacing: "0.06em",
   },
   urgencyNote: {
     fontSize: "11px",
-    fontFamily: "system-ui, sans-serif",
+    fontFamily: "'Share Tech Mono', monospace",
     letterSpacing: "0.04em",
     opacity: 0.85,
   },

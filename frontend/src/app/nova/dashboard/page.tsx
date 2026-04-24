@@ -90,7 +90,7 @@ export default function DashboardPage() {
   if (!email) {
     return (
       <main style={s.page}>
-        <p style={s.dim}>No session found. <a href="/nova" style={{ color: "#c9a96e" }}>Return to Nova →</a></p>
+        <p style={s.dim}>No session found. <a href="/nova" style={{ color: "#00e5ff" }}>Return to Nova →</a></p>
       </main>
     );
   }
@@ -229,7 +229,7 @@ function KitDisplay({ kit }: { kit: BrandingKit }) {
 function KitSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ border: "1px solid #1a1a1a", borderRadius: "2px", padding: "20px 24px", background: "#0d0d0d" }}>
-      <p style={{ fontSize: "10px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#c9a96e", fontFamily: "system-ui,sans-serif", marginBottom: "14px" }}>
+      <p style={{ fontSize: "10px", letterSpacing: "0.18em", textTransform: "uppercase", color: "#00e5ff", fontFamily: "system-ui,sans-serif", marginBottom: "14px" }}>
         {title}
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>{children}</div>
@@ -250,26 +250,26 @@ function KitRow({ label, value }: { label: string; value?: string }) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s: Record<string, React.CSSProperties> = {
-  page:            { minHeight: "100vh", maxWidth: "640px", margin: "0 auto", padding: "0 24px 80px", display: "flex", flexDirection: "column" },
+  page:            { minHeight: "100vh", maxWidth: "640px", margin: "0 auto", padding: "0 24px 80px", display: "flex", flexDirection: "column", background: "#0a0a0a" },
   header:          { display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "32px", paddingBottom: "40px" },
-  wordmark:        { fontSize: "11px", letterSpacing: "0.22em", color: "#3a3a3a", fontFamily: "system-ui,sans-serif", fontWeight: 600 },
-  ghostLink:       { fontSize: "11px", color: "#3a3a3a", fontFamily: "system-ui,sans-serif", letterSpacing: "0.08em" },
+  wordmark:        { fontSize: "11px", letterSpacing: "0.22em", color: "#00ff88", fontFamily: "'Share Tech Mono',monospace", fontWeight: 600 },
+  ghostLink:       { fontSize: "11px", color: "#606060", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.08em" },
   confirmBanner:   { display: "flex", alignItems: "center", gap: "10px", marginBottom: "32px", padding: "12px 16px", border: "1px solid #1a2a1a", borderRadius: "2px", background: "#0a140a" },
-  confirmDot:      { width: "6px", height: "6px", borderRadius: "50%", background: "#4a7c59", flexShrink: 0 },
-  confirmText:     { fontSize: "12px", color: "#4a7c59", fontFamily: "system-ui,sans-serif", letterSpacing: "0.06em", flex: 1 },
-  txLink:          { fontSize: "11px", color: "#c9a96e", fontFamily: "system-ui,sans-serif", letterSpacing: "0.06em", flexShrink: 0 },
+  confirmDot:      { width: "6px", height: "6px", borderRadius: "50%", background: "#00ff88", flexShrink: 0 },
+  confirmText:     { fontSize: "12px", color: "#00ff88", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.06em", flex: 1 },
+  txLink:          { fontSize: "11px", color: "#00e5ff", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.06em", flexShrink: 0 },
   stageRow:        { marginBottom: "32px" },
-  stageLabel:      { fontSize: "13px", color: "#5a5a5a", fontFamily: "system-ui,sans-serif" },
+  stageLabel:      { fontSize: "13px", color: "#606060", fontFamily: "'Share Tech Mono',monospace" },
   chatWrap:        { display: "flex", flexDirection: "column", gap: "12px", marginBottom: "48px" },
-  chatLog:         { minHeight: "180px", display: "flex", flexDirection: "column", gap: "10px", padding: "20px", border: "1px solid #1a1a1a", borderRadius: "2px", background: "#0a0a0a" },
-  chatPlaceholder: { fontSize: "13px", color: "#2e2e2e", fontFamily: "system-ui,sans-serif", lineHeight: 1.6 },
-  bubble:          { maxWidth: "80%", padding: "10px 14px", borderRadius: "2px", fontSize: "13px", fontFamily: "system-ui,sans-serif", lineHeight: 1.6 },
-  bubbleUser:      { alignSelf: "flex-end", background: "#1a1a1a", color: "#e8e3dc" },
-  bubbleNova:      { alignSelf: "flex-start", background: "#0d1a0d", color: "#a0c8a0", border: "1px solid #1a2a1a" },
+  chatLog:         { minHeight: "180px", display: "flex", flexDirection: "column", gap: "10px", padding: "20px", border: "1px solid #1a2a1a", borderRadius: "2px", background: "#0d1117" },
+  chatPlaceholder: { fontSize: "13px", color: "#3a3a3a", fontFamily: "'Share Tech Mono',monospace", lineHeight: 1.6 },
+  bubble:          { maxWidth: "80%", padding: "10px 14px", borderRadius: "2px", fontSize: "13px", fontFamily: "'Rajdhani',system-ui,sans-serif", lineHeight: 1.6 },
+  bubbleUser:      { alignSelf: "flex-end", background: "#1a1a1a", color: "#c0c0c0" },
+  bubbleNova:      { alignSelf: "flex-start", background: "#0d1a12", color: "#00ff88", border: "1px solid #1a2a1a" },
   inputRow:        { display: "flex", gap: "8px" },
-  chatInput:       { flex: 1, padding: "12px 14px", background: "#111", border: "1px solid #222", borderRadius: "2px", color: "#e8e3dc", fontSize: "14px", fontFamily: "system-ui,sans-serif", outline: "none" },
-  sendBtn:         { padding: "12px 20px", background: "#c9a96e", color: "#080808", border: "none", borderRadius: "2px", fontSize: "12px", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", fontFamily: "system-ui,sans-serif" },
-  errNote:         { fontSize: "12px", color: "#ef4444", fontFamily: "system-ui,sans-serif" },
+  chatInput:       { flex: 1, padding: "12px 14px", background: "#0d1117", border: "1px solid #1a2a1a", borderRadius: "2px", color: "#c0c0c0", fontSize: "14px", fontFamily: "'Share Tech Mono',monospace", outline: "none" },
+  sendBtn:         { padding: "12px 20px", background: "#00e5ff", color: "#0a0a0a", border: "none", borderRadius: "2px", fontSize: "12px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer", fontFamily: "'Share Tech Mono',monospace" },
+  errNote:         { fontSize: "12px", color: "#ef4444", fontFamily: "'Share Tech Mono',monospace" },
   footer:          { marginTop: "auto", paddingTop: "32px" },
-  dim:             { fontSize: "11px", color: "#2a2a2a", fontFamily: "system-ui,sans-serif" },
+  dim:             { fontSize: "11px", color: "#2a2a2a", fontFamily: "'Share Tech Mono',monospace" },
 };
