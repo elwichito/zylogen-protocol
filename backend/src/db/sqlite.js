@@ -33,19 +33,20 @@ db.exec(`
     amount_cents      INTEGER NOT NULL,
     tx_hash           TEXT,
     status            TEXT    NOT NULL DEFAULT 'pending'
-                              CHECK (status IN ('pending','locked','released','refunded')),
+                              CHECK (status IN ('pending','pending_wallet','locked','released','refunded','relay_failed')),
     created_at        DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
   CREATE TABLE IF NOT EXISTS nova_sessions (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_email TEXT    NOT NULL,
-    stage        TEXT    NOT NULL DEFAULT 'briefing'
-                         CHECK (stage IN ('briefing','kit_delivered')),
-    brand_context TEXT,
-    branding_kit  TEXT,
-    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_email      TEXT    NOT NULL UNIQUE,
+    stripe_session_id TEXT,
+    stage             TEXT    NOT NULL DEFAULT 'briefing'
+                               CHECK (stage IN ('briefing','kit_delivered')),
+    brand_context     TEXT,
+    branding_kit      TEXT,
+    created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
   -- Single-row scarcity counter (INSERT OR IGNORE seeds it once)
