@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "Nova — Elite Business AI Worker on Base",
@@ -34,7 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           a { color: inherit; text-decoration: none; }
         `}</style>
       </head>
-      <body>{children}</body>
+      <body><Providers>{children}</Providers></body>
     </html>
   );
 }
