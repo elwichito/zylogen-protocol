@@ -115,6 +115,12 @@ async function relayPaymentToEscrow(clientAddress, customerEmail, stripeSessionI
 
     db.prepare(`UPDATE scarcity SET claimed = claimed + 1 WHERE id = 1`).run();
 
+    // Create Nova session profile (DRY RUN)
+    db.prepare(`
+      INSERT OR IGNORE INTO nova_sessions (client_email, stripe_session_id)
+      VALUES (?, ?)
+    `).run(customerEmail, stripeSessionId);
+
     console.log(`[paymentRelay] DRY RUN — wrote mock record taskId=${mockTaskId}`);
     return { taskId: mockTaskId, txHash: mockTxHash, dryRun: true };
   }
@@ -158,6 +164,12 @@ async function relayPaymentToEscrow(clientAddress, customerEmail, stripeSessionI
 
   // 5. Increment scarcity counter
   db.prepare(`UPDATE scarcity SET claimed = claimed + 1 WHERE id = 1`).run();
+
+  // 6. Create Nova session profile (so Nova "knows" the client before first message)
+  db.prepare(`
+    INSERT OR IGNORE INTO nova_sessions (client_email, stripe_session_id)
+    VALUES (?, ?)
+  `).run(customerEmail, stripeSessionId);
 
   console.log(`[paymentRelay] Locked task #${taskId} for ${customerEmail} | tx: ${receipt.hash}`);
   return { taskId, txHash: receipt.hash };

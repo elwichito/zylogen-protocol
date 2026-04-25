@@ -31,7 +31,7 @@ const MODEL = "claude-sonnet-4-5";
  * @returns {{ stage: string, reply?: string, kit?: object }}
  */
 async function processClientMessage(email, userMessage) {
-  // Upsert session
+  // Upsert session (may already exist from payment relay)
   db.prepare(`
     INSERT OR IGNORE INTO nova_sessions (client_email) VALUES (?)
   `).run(email);
@@ -40,10 +40,18 @@ async function processClientMessage(email, userMessage) {
     `SELECT * FROM nova_sessions WHERE client_email = ?`
   ).get(email);
 
+  // Load payment context for personalization
+  const escrow = db.prepare(
+    `SELECT client_wallet, created_at FROM escrow_records WHERE client_email = ? AND status IN ('locked','released') LIMIT 1`
+  ).get(email);
+
   if (session.stage === "kit_delivered") {
-    // Follow-up question after kit delivery
+    // Follow-up question after kit delivery — include kit context so Nova remembers
+    const kitContext = session.branding_kit
+      ? `The client's delivered Branding Kit: ${session.branding_kit}`
+      : "";
     const reply = await askClaude([
-      { role: "system", content: "You are Nova. The client's Branding Kit is complete. Answer follow-up questions concisely." },
+      { role: "system", content: `You are Nova, an elite branding consultant. The client's Branding Kit is complete. ${kitContext} Answer follow-up questions about their brand concisely, referencing their kit when relevant.` },
       { role: "user",   content: userMessage },
     ]);
     return { stage: "followup", reply };
@@ -56,7 +64,12 @@ async function processClientMessage(email, userMessage) {
 
   history.push({ role: "user", content: userMessage });
 
-  const systemPrompt = `You are Nova, an elite branding consultant for Instagram professionals.
+  // Build client context for Nova's awareness
+  const clientContext = escrow
+    ? `\nClient context: Founding 100 member (wallet ${escrow.client_wallet?.slice(0, 6)}…${escrow.client_wallet?.slice(-4)}, joined ${escrow.created_at}). Treat them as a premium client.`
+    : "";
+
+  const systemPrompt = `You are Nova, an elite branding consultant for Instagram professionals.${clientContext}
 Collect these 7 data points through natural conversation (one question at a time):
 business name, niche, target audience, brand voice (3 adjectives), color preferences,
 competitor inspiration, primary quarterly goal.
