@@ -189,4 +189,46 @@ router.get("/status", (req, res) => {
   res.json({ stage: session.stage, kit: session.branding_kit ? JSON.parse(session.branding_kit) : null });
 });
 
+// ─── TEMPORARY: Admin seed for Wichi's locked sessions ──────────────────────
+// Two on-chain lock() txs confirmed but backend was not deployed with verify-payment.
+// This injects the records manually. Remove after use.
+
+router.post("/admin-seed-wichi", async (req, res) => {
+  const SECRET = "zyl-override-2026";
+  if (req.body.secret !== SECRET) return res.status(403).json({ error: "forbidden" });
+
+  const wallet = "0xE920139a09E6345236d920BdA0c0D6D4298568b1";
+  const email  = "moringutierrez@icloud.com";
+  const txHashes = [
+    req.body.tx1 || "0x_wichi_lock_tx_1",
+    req.body.tx2 || "0x_wichi_lock_tx_2",
+  ];
+
+  try {
+    for (const tx of txHashes) {
+      const exists = db.prepare(`SELECT id FROM escrow_records WHERE stripe_session_id = ?`).get(tx);
+      if (!exists) {
+        db.prepare(`
+          INSERT INTO escrow_records (stripe_session_id, client_email, client_wallet, tx_hash, amount_cents, status)
+          VALUES (?, ?, ?, ?, ?, 'locked')
+        `).run(tx, email, wallet, tx, 999);
+
+        db.prepare(`UPDATE scarcity SET claimed = claimed + 1 WHERE id = 1`).run();
+      }
+    }
+
+    db.prepare(`INSERT OR IGNORE INTO nova_sessions (client_email) VALUES (?)`).run(email);
+
+    const scarcity = db.prepare(`SELECT claimed FROM scarcity WHERE id = 1`).get();
+    const session  = db.prepare(`SELECT * FROM nova_sessions WHERE client_email = ?`).get(email);
+    const records  = db.prepare(`SELECT * FROM escrow_records WHERE client_email = ?`).all(email);
+
+    console.log(`[admin-seed] Injected session for ${email} — ${records.length} escrow record(s)`);
+    res.json({ ok: true, scarcity, session, records });
+  } catch (err) {
+    console.error("[admin-seed]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
