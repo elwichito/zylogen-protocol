@@ -38,17 +38,50 @@ db.exec(`
   );
 
   CREATE TABLE IF NOT EXISTS nova_sessions (
-    id                INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_email      TEXT    NOT NULL UNIQUE,
-    stripe_session_id TEXT,
-    stage             TEXT    NOT NULL DEFAULT 'briefing'
-                               CHECK (stage IN ('briefing','kit_delivered')),
-    brand_context     TEXT,
-    branding_kit      TEXT,
-    created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_email        TEXT    NOT NULL UNIQUE,
+    stripe_session_id   TEXT,
+    stage               TEXT    NOT NULL DEFAULT 'briefing_q1'
+                                 CHECK (stage IN ('briefing','briefing_q1','briefing_q2','briefing_q3','brief_complete','kit_delivered')),
+    language            TEXT,
+    business_type       TEXT,
+    vibe_tags           TEXT,
+    brand_description   TEXT,
+    brief_submitted_at  DATETIME,
+    delivery_status     TEXT    DEFAULT NULL
+                                 CHECK (delivery_status IS NULL OR delivery_status IN ('pending','in_progress','delivered')),
+    brand_context       TEXT,
+    branding_kit        TEXT,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  -- v2 migration: add new columns if missing (safe to run repeatedly)
+
+`);
+
+// Column migrations for existing nova_sessions table
+const existingCols = db.prepare(`PRAGMA table_info(nova_sessions)`).all().map((c) => c.name);
+const migrations = [
+  { col: "language",           sql: `ALTER TABLE nova_sessions ADD COLUMN language TEXT` },
+  { col: "business_type",     sql: `ALTER TABLE nova_sessions ADD COLUMN business_type TEXT` },
+  { col: "vibe_tags",         sql: `ALTER TABLE nova_sessions ADD COLUMN vibe_tags TEXT` },
+  { col: "brand_description", sql: `ALTER TABLE nova_sessions ADD COLUMN brand_description TEXT` },
+  { col: "brief_submitted_at",sql: `ALTER TABLE nova_sessions ADD COLUMN brief_submitted_at DATETIME` },
+  { col: "delivery_status",   sql: `ALTER TABLE nova_sessions ADD COLUMN delivery_status TEXT DEFAULT NULL` },
+];
+
+for (const m of migrations) {
+  if (!existingCols.includes(m.col)) {
+    db.exec(m.sql);
+    console.log(`[db] Migrated: added column nova_sessions.${m.col}`);
+  }
+}
+
+// Migrate old 'briefing' stage to 'briefing_q1' for existing sessions
+db.prepare(`UPDATE nova_sessions SET stage = 'briefing_q1' WHERE stage = 'briefing'`).run();
+
+db.exec(`
   -- Single-row scarcity counter (INSERT OR IGNORE seeds it once)
   CREATE TABLE IF NOT EXISTS scarcity (
     id      INTEGER PRIMARY KEY CHECK (id = 1),

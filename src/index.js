@@ -64,7 +64,6 @@ app.listen(PORT, () => {
   console.log(`  POST /api/nova/checkout`);
   console.log(`  POST /api/nova/message`);
   console.log(`  POST /api/nova/verify-payment`);
-  console.log(`  POST /api/nova/admin-seed-wichi`);
   console.log(`  GET  /api/nova/status?email=`);
   console.log(`  GET  /health`);
 });
