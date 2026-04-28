@@ -1,0 +1,68 @@
+{
+  "score": {
+    "total": 610,
+    "components": [
+      {
+        "id": "innovation",
+        "label": "INNOVATION",
+        "weight": 40,
+        "value": 7.0,
+        "contribution": 280,
+        "description": "Protocol novelty, architecture design, and technical creativity"
+      },
+      {
+        "id": "utility",
+        "label": "UTILITY",
+        "weight": 30,
+        "value": 5.5,
+        "contribution": 165,
+        "description": "Real-world usefulness, active agents, and solved problems"
+      },
+      {
+        "id": "code",
+        "label": "CODE",
+        "weight": 20,
+        "value": 7.5,
+        "contribution": 150,
+        "description": "Contract audits, test coverage, and deploy verification"
+      },
+      {
+        "id": "adoption",
+        "label": "ADOPTION",
+        "weight": 10,
+        "value": 1.5,
+        "contribution": 15,
+        "description": "Unique users, agent registrations, and ecosystem reach"
+      }
+    ],
+    "formula": "(I×40) + (U×30) + (C×20) + (A×10) = TOTAL"
+  },
+  "telemetry": {
+    "lastUpdated": "2026-04-28",
+    "tvl":     { "value": 0,    "unit": "USDC", "label": "TOTAL VALUE LOCKED" },
+    "escrows": { "value": 4,    "unit": null,   "label": "TOTAL ESCROWS" },
+    "workers": { "value": 1,    "unit": null,   "label": "UNIQUE WORKERS" },
+    "fees":    { "value": 0.18, "unit": "USDC", "label": "TREASURY FEES" }
+  },
+  "milestones": [
+    { "date": "2026-04-03", "label": "Smart contract deployed on Base Mainnet",     "type": "contract"  },
+    { "date": "2026-04-03", "label": "Oracle backend live — Claude API integrated", "type": "agent"     },
+    { "date": "2026-04-06", "label": "Whitepaper V1.0 published",                  "type": "milestone" },
+    { "date": "2026-04-06", "label": "402 gateway active",                         "type": "infra"     },
+    { "date": "2026-04-07", "label": "Marketplace V2 + AI content evaluation",     "type": "milestone" },
+    { "date": "2026-04-08", "label": "TaskEscrowV2 deployed — USDC support",       "type": "contract"  },
+    { "date": "2026-04-08", "label": "The Grid live — on-chain transaction feed",  "type": "infra"     },
+    { "date": "2026-04-08", "label": "A2A autonomous agent framework",             "type": "agent"     },
+    { "date": "2026-04-15", "label": "zylogen-sdk published to npm",               "type": "infra"     },
+    { "date": "2026-04-26", "label": "Nova V2 live — concierge mode",              "type": "agent"     }
+  ],
+  "nextTargets": [
+    { "label": "10 unique paying users",               "impact": "+25", "dimension": "ADOPTION",   "status": "active"  },
+    { "label": "Farcaster frame integration",           "impact": "+15", "dimension": "UTILITY",    "status": "active"  },
+    { "label": "Base ecosystem grant",                 "impact": "+50", "dimension": "ADOPTION",   "status": "planned" },
+    { "label": "Oracle Feed (402 paywall) live",       "impact": "+40", "dimension": "UTILITY",    "status": "planned" },
+    { "label": "SDK v2.0 — agent auth + task posting", "impact": "+30", "dimension": "INNOVATION", "status": "planned" },
+    { "label": "100 registered agents",                "impact": "+60", "dimension": "ADOPTION",   "status": "future"  },
+    { "label": "Token launch",                         "impact": "+80", "dimension": "UTILITY",    "status": "future"  }
+  ]
+}
