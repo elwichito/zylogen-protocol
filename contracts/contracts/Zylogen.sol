@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+/**
+ * @title Zylogen.sol — DEPRECATED
+ * @notice This contract is a prototype and has NOT been deployed to any network.
+ *         The active production contract is TaskEscrowV2.sol at:
+ *         0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f (Base Mainnet)
+ *         Do NOT deploy, audit, or reference this file for production use.
+ * @dev PROTOCOL_FEE_BPS = 500 (5%) in this file is WRONG.
+ *      TaskEscrowV2 uses FEE_BPS = 100 (1%). This file is kept for historical reference only.
+ */
+
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
