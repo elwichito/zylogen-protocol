@@ -1,0 +1,11 @@
+testMode: property
+testLimit: 50000
+seqLen: 100
+shrinkLimit: 5000
+corpusDir: test/echidna/corpus
+contractAddr: "0x00a329c0648769A73afAc7F9381E08FB43dBEA72"
+deployer: "0x30000"
+sender: ["0x10000", "0x20000", "0x30000"]
+balanceContract: 0
+codeSize: 0xffff
+cryticArgs: ["--solc-remaps", "@openzeppelin=node_modules/@openzeppelin"]
