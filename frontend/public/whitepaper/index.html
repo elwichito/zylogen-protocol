@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zylogen Whitepaper — Sound money for the machine economy</title>
+<meta name="description" content="Zylogen is a settlement protocol for autonomous AI agents on Base. Fixed supply ZYL token, deflationary by mechanism, designed for verifiable trust without humans in the loop.">
+<!-- Open Graph -->
+<meta property="og:title" content="Zylogen Whitepaper — Sound money for the machine economy">
+<meta property="og:description" content="Zylogen is a settlement protocol for autonomous AI agents on Base. Fixed supply ZYL token, deflationary by mechanism, designed for verifiable trust without humans in the loop.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://zylogen.xyz/whitepaper">
+<meta property="og:site_name" content="Zylogen Protocol">
+<!-- Twitter / X / Farcaster card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Zylogen Whitepaper — Sound money for the machine economy">
+<meta name="twitter:description" content="Zylogen is a settlement protocol for autonomous AI agents on Base. Fixed supply ZYL token, deflationary by mechanism, designed for verifiable trust without humans in the loop.">
+<meta name="twitter:site" content="@ZylogenProtocol">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⬡</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ─── Reset + Root ──────────────────────────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a0a;--bg2:#0d1117;
+  --green:#00ff88;--green2:#00cc6a;--green-dim:#00ff8822;
+  --cyan:#00e5ff;--cyan-dim:#00e5ff15;
+  --border:#1a2a1a;
+  --text:#c0c0c0;--text-dim:#606060;
+  --card-bg:#0d1a12;--card-border:#0f2f1a;
+  --glow:0 0 30px #00ff8833;
+  --orange:#ff6b00;--red:#ff4444;--purple:#a855f7
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;font-size:17px;line-height:1.7;overflow-x:hidden}
+
+/* ─── Grid background ───────────────────────────────────────────────────────── */
+.grid-bg{position:fixed;top:0;left:0;width:100%;height:100%;background-image:linear-gradient(rgba(0,255,136,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,0.03) 1px,transparent 1px);background-size:60px 60px;z-index:0;pointer-events:none}
+
+/* ─── Nav (identical to landing) ───────────────────────────────────────────── */
+nav{position:fixed;top:0;width:100%;z-index:100;background:rgba(10,10,10,0.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 40px;height:56px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{font-family:'Orbitron',sans-serif;font-weight:900;font-size:14px;letter-spacing:4px;color:var(--green);text-decoration:none}
+.nav-logo span{color:var(--cyan)}
+.nav-links{display:flex;gap:28px;align-items:center}
+.nav-links a{color:var(--text-dim);text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;transition:color .3s}
+.nav-links a:hover{color:var(--green)}
+.nav-links a::before{content:'◆ ';color:var(--green);opacity:0;transition:opacity .3s}
+.nav-links a:hover::before,.nav-links a.active::before{opacity:1}
+.nav-links a.active{color:var(--green)}
+.nav-right{display:flex;align-items:center;gap:16px}
+.nav-status{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--green);display:flex;align-items:center;gap:6px}
+.nav-status::before{content:'';width:6px;height:6px;background:var(--green);border-radius:50%;animation:pulse-dot 2s infinite}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.3}}
+.btn-connect{background:transparent;border:1px solid var(--green);color:var(--green);padding:8px 20px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;text-decoration:none;display:inline-block;transition:all .3s}
+.btn-connect:hover{background:var(--green);color:var(--bg);box-shadow:var(--glow)}
+
+/* ─── Ticker (identical to landing) ────────────────────────────────────────── */
+.ticker-bar{position:fixed;top:56px;width:100%;background:rgba(0,255,136,0.05);border-bottom:1px solid var(--border);height:28px;overflow:hidden;z-index:99;display:flex;align-items:center}
+.ticker-content{display:flex;white-space:nowrap;animation:ticker 40s linear infinite;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--green);opacity:.6}
+@keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.ticker-content span{margin-right:40px}
+
+/* ─── Page shell ────────────────────────────────────────────────────────────── */
+.wp-page{position:relative;z-index:1;padding-top:108px;padding-bottom:100px}
+.wp-container{max-width:760px;margin:0 auto;padding:0 40px}
+
+/* ─── Header block ──────────────────────────────────────────────────────────── */
+.wp-header{border-left:3px solid var(--green);padding:36px 40px 36px 28px;margin-bottom:56px;background:linear-gradient(90deg,rgba(0,255,136,0.03),transparent)}
+.wp-symbol{font-size:28px;display:block;margin-bottom:14px}
+.wp-title{font-family:'Orbitron',sans-serif;font-size:clamp(26px,5vw,40px);font-weight:900;color:var(--green);letter-spacing:2px;line-height:1.1;margin-bottom:6px}
+.wp-subtitle{font-family:'Orbitron',sans-serif;font-size:clamp(13px,2vw,18px);font-weight:400;color:var(--cyan);letter-spacing:3px;margin-bottom:24px}
+.wp-byline{font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;line-height:2}
+.wp-byline a{color:var(--cyan);text-decoration:none}
+.wp-byline a:hover{text-decoration:underline}
+
+/* ─── Table of contents ─────────────────────────────────────────────────────── */
+.wp-toc-wrap{margin-bottom:56px;padding:28px 32px;border:1px solid var(--border);background:var(--bg2)}
+.wp-toc-label{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:4px;color:var(--cyan);opacity:.7;margin-bottom:20px}
+.wp-toc-label::before{content:'// '}
+/* reuse .wp-toc from landing; override cursor + counter format */
+.wp-toc{list-style:none;counter-reset:toc}
+.wp-toc li{counter-increment:toc;padding:10px 0;border-bottom:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--text);transition:color .3s;cursor:pointer}
+.wp-toc li:last-child{border-bottom:none}
+.wp-toc li:hover{color:var(--green)}
+.wp-toc li::before{content:counter(toc,decimal-leading-zero)' — ';color:var(--text-dim);margin-right:8px}
+.wp-toc li a{color:inherit;text-decoration:none;letter-spacing:2px;text-transform:uppercase}
+.wp-toc li:hover a{color:var(--green)}
+
+/* ─── Article typography ────────────────────────────────────────────────────── */
+.wp-article h2{font-family:'Orbitron',sans-serif;font-size:22px;font-weight:700;color:#fff;letter-spacing:2px;margin:56px 0 18px;padding-top:24px;border-top:1px solid var(--border)}
+.wp-article h3{font-family:'Orbitron',sans-serif;font-size:18px;font-weight:700;color:var(--green);letter-spacing:1px;margin:36px 0 14px}
+.wp-article h4{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:3px;color:var(--cyan);text-transform:uppercase;margin:28px 0 12px}
+.wp-article p{margin-bottom:18px;font-weight:300}
+.wp-article p:last-child{margin-bottom:0}
+.wp-article strong{color:#fff;font-weight:600}
+.wp-article ul,.wp-article ol{margin:14px 0 20px;padding:0;list-style:none}
+.wp-article li{padding:5px 0 5px 22px;position:relative;font-weight:300}
+.wp-article ul li::before{content:'→';position:absolute;left:0;color:var(--green);opacity:.7}
+.wp-article ol{counter-reset:olist}
+.wp-article ol li{counter-increment:olist}
+.wp-article ol li::before{content:counter(olist)'.';position:absolute;left:0;color:var(--green);font-family:'Share Tech Mono',monospace;font-size:12px;line-height:1.9}
+
+/* Abstract callout block */
+.wp-abstract{border-left:3px solid var(--green);padding:1.5rem 1.5rem 1.5rem 1.25rem;margin-bottom:56px;background:rgba(0,255,136,0.02)}
+.wp-abstract-label{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:4px;color:var(--green);opacity:.75;margin-bottom:14px;display:block}
+.wp-abstract-label::before{content:'// '}
+.wp-abstract p{font-size:16px;font-weight:300;line-height:1.85;margin-bottom:14px}
+.wp-abstract p:last-child{margin-bottom:0}
+
+/* Section number tag */
+.wp-sec-num{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:4px;color:var(--text-dim);display:block;margin-bottom:6px}
+
+/* Inline code + address */
+code{font-family:'Share Tech Mono',monospace;color:var(--cyan);background:rgba(0,229,255,0.06);padding:2px 7px;font-size:13px;border-radius:1px}
+
+/* Code / diagram blocks */
+pre{font-family:'Share Tech Mono',monospace;color:var(--cyan);background:rgba(0,229,255,0.03);border:1px solid var(--border);padding:24px;margin:24px 0;overflow-x:auto;white-space:pre;font-size:12px;line-height:1.8}
+pre.ascii-art{color:var(--green);background:transparent;border:none;text-align:center;font-size:15px;line-height:1.5;margin:0}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;margin:20px 0 24px;font-size:15px}
+thead tr{border-bottom:2px solid var(--green);background:rgba(0,255,136,0.04)}
+th{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--green);text-transform:uppercase;padding:12px 14px;text-align:left}
+td{padding:10px 14px;border-bottom:1px solid var(--border);font-weight:300;color:var(--text);vertical-align:top}
+tr:hover td{background:rgba(0,255,136,0.015)}
+.td-r{text-align:right;font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--cyan)}
+
+/* Divider */
+.wp-divider{width:100%;height:1px;background:linear-gradient(90deg,transparent,var(--green),transparent);margin:52px 0}
+
+/* Closing monolith block */
+.wp-monolith{margin:52px 0 40px;text-align:center;padding:40px 0}
+.wp-monolith-closing{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:4px;color:var(--green);margin-top:20px;opacity:.8;text-transform:uppercase}
+
+/* Document refs box */
+.wp-refs{margin-top:52px;padding:28px 32px;border:1px solid var(--border);background:var(--bg2)}
+.wp-refs-label{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:4px;color:var(--cyan);opacity:.7;margin-bottom:20px}
+.wp-refs-label::before{content:'// '}
+.wp-ref-row{display:flex;gap:16px;padding:9px 0;border-bottom:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:11px;flex-wrap:wrap;align-items:baseline}
+.wp-ref-row:last-child{border-bottom:none}
+.wp-ref-key{color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;min-width:110px;flex-shrink:0}
+.wp-ref-val{color:var(--cyan)}
+.wp-ref-val a{color:var(--cyan);text-decoration:none}
+.wp-ref-val a:hover{text-decoration:underline}
+.wp-ref-note{color:var(--text-dim);font-size:10px;line-height:1.7}
+
+/* ─── Footer (identical to landing) ────────────────────────────────────────── */
+footer{border-top:1px solid var(--border);padding:48px 80px;position:relative;z-index:1}
+.footer-main{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:40px}
+.footer-brand{max-width:300px}
+.footer-logo{font-family:'Orbitron',sans-serif;font-weight:900;font-size:14px;letter-spacing:4px;color:var(--green);margin-bottom:12px}
+.footer-desc{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);line-height:1.8;letter-spacing:1px}
+.footer-col h5{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;color:var(--text-dim);margin-bottom:16px}
+.footer-col a{display:block;color:var(--text);text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1px;padding:4px 0;transition:color .3s}
+.footer-col a:hover{color:var(--green)}
+.footer-bottom{display:flex;justify-content:space-between;align-items:center;padding-top:24px;border-top:1px solid var(--border)}
+.footer-copy{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:2px}
+.footer-legal{display:flex;gap:24px}
+.footer-legal a{color:var(--text-dim);text-decoration:none;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;transition:color .3s}
+.footer-legal a:hover{color:var(--green)}
+
+/* ─── Responsive ────────────────────────────────────────────────────────────── */
+@media(max-width:1024px){
+  nav{padding:0 24px}
+  .wp-container{padding:0 32px}
+  footer{padding:40px 32px}
+}
+@media(max-width:640px){
+  .nav-links,.nav-status{display:none}
+  .wp-container{padding:0 1rem;max-width:100%}
+  .wp-page{padding-top:96px}
+  .wp-header{padding:24px 20px 24px 18px}
+  .wp-title{font-size:26px}
+  .wp-abstract{padding:1rem 1rem 1rem 1rem}
+  pre{font-size:11px;padding:16px;overflow-x:auto}
+  table{font-size:13px;display:block;overflow-x:auto}
+  footer{padding:40px 24px}
+  .footer-main{flex-direction:column;gap:32px}
+  .footer-bottom{flex-direction:column;gap:16px;text-align:center}
+  .wp-toc-wrap{padding:20px 20px}
+  .wp-refs{padding:20px 20px}
+}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<!-- ═══ NAV ══════════════════════════════════════════════════════════════════ -->
+<nav>
+  <a href="/" class="nav-logo">ZYLOGEN<span>.PROTOCOL</span></a>
+  <div class="nav-links">
+    <a href="/#how">How It Works</a>
+    <a href="/#nova" style="color:var(--cyan)">Nova</a>
+    <a href="/#destinations">Protocol</a>
+    <a href="/#proof">Proof of Work</a>
+    <a href="/whitepaper" class="active">Whitepaper</a>
+    <a href="/#roadmap">Roadmap</a>
+    <a href="/#community">Community</a>
+    <a href="/oracle.html">Oracle</a>
+  </div>
+  <div class="nav-right">
+    <div class="nav-status">BASE MAINNET</div>
+    <a href="/" class="btn-connect">← BACK</a>
+  </div>
+</nav>
+
+<!-- ═══ TICKER ════════════════════════════════════════════════════════════════ -->
+<div class="ticker-bar">
+  <div class="ticker-content">
+    <span>FIXED SUPPLY · 1,000,000,000 ZYL</span><span>◆</span>
+    <span>DEFLATIONARY BY MECHANISM</span><span>◆</span>
+    <span>TRUST WITHOUT HUMANS IN THE LOOP</span><span>◆</span>
+    <span>BASE MAINNET · CHAIN 8453</span><span>◆</span>
+    <span>ESCROW PROTECTED · AI ORACLE SETTLED</span><span>◆</span>
+    <span>ON-CHAIN REPUTATION</span><span>◆</span>
+    <span>V2.0.0-PRE-AUDIT</span><span>◆</span>
+    <span>SOUND MONEY FOR THE MACHINE ECONOMY</span><span>◆</span>
+    <span>FIXED SUPPLY · 1,000,000,000 ZYL</span><span>◆</span>
+    <span>DEFLATIONARY BY MECHANISM</span><span>◆</span>
+    <span>TRUST WITHOUT HUMANS IN THE LOOP</span><span>◆</span>
+    <span>BASE MAINNET · CHAIN 8453</span><span>◆</span>
+    <span>ESCROW PROTECTED · AI ORACLE SETTLED</span><span>◆</span>
+    <span>ON-CHAIN REPUTATION</span><span>◆</span>
+    <span>V2.0.0-PRE-AUDIT</span><span>◆</span>
+    <span>SOUND MONEY FOR THE MACHINE ECONOMY</span><span>◆</span>
+  </div>
+</div>
+
+<!-- ═══ MAIN ══════════════════════════════════════════════════════════════════ -->
+<main class="wp-page">
+<div class="wp-container">
+
+  <!-- HEADER -->
+  <div class="wp-header">
+    <span class="wp-symbol">🜂</span>
+    <h1 class="wp-title">ZYLOGEN</h1>
+    <div class="wp-subtitle">Sound money for the machine economy.</div>
+    <div class="wp-byline">
+      A settlement protocol for autonomous AI agents on Base.<br>
+      Version 1.0 — April 2026<br>
+      <a href="https://zylogen.xyz">zylogen.xyz</a> &middot; <a href="https://github.com/elwichito/zylogen-protocol" target="_blank" rel="noreferrer">github.com/elwichito/zylogen-protocol</a>
+    </div>
+  </div>
+
+  <!-- TABLE OF CONTENTS -->
+  <div class="wp-toc-wrap">
+    <div class="wp-toc-label">TABLE OF CONTENTS</div>
+    <ol class="wp-toc">
+      <li><a href="#abstract">Abstract</a></li>
+      <li><a href="#s1">The Thesis</a></li>
+      <li><a href="#s2">The Protocol</a></li>
+      <li><a href="#s3">The Economic Flywheel</a></li>
+      <li><a href="#s4">Design Principles</a></li>
+      <li><a href="#s5">Threat Model</a></li>
+      <li><a href="#s6">Why Base</a></li>
+      <li><a href="#s7">Roadmap</a></li>
+      <li><a href="#s8">What We Are Not</a></li>
+      <li><a href="#s9">The Team &amp; Closing</a></li>
+    </ol>
+  </div>
+
+  <!-- ARTICLE -->
+  <div class="wp-article">
+
+    <!-- ABSTRACT -->
+    <div id="abstract" class="wp-abstract">
+      <span class="wp-abstract-label">ABSTRACT</span>
+      <p>We propose Zylogen, a settlement protocol for autonomous AI agents. Where existing payment rails were designed for humans transacting with humans, Zylogen is the first economic substrate designed from first principles for machines transacting with machines and with humans.</p>
+      <p>The protocol consists of three components: a smart-contract escrow with deterministic settlement (TaskEscrowV2), a staking mechanism that creates forced utility for an agent-native token (SparkStaking), and a soulbound identity layer that makes agent reputation an economic asset (AgentID). The native token, ZYL, has a fixed supply of 1,000,000,000 units, deflationary by mechanism, and is required infrastructure: no agent operates on Zylogen without holding, staking, or earning ZYL.</p>
+      <p>Zylogen runs on Base. The first version is live on mainnet at <code>0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f</code> with a 100% oracle success rate across 32 settled transactions. This document describes the architecture, economics, and roadmap of the next version.</p>
+    </div>
+
+    <div class="wp-divider"></div>
+
+    <!-- 1. THE THESIS -->
+    <section id="s1">
+      <span class="wp-sec-num">// 01</span>
+      <h2>The Thesis</h2>
+      <p>The autonomous agent economy is real and accelerating. By 2026, AI agents execute trades, write code, generate media, manage operations, and increasingly transact with each other and with humans. None of this happens on rails built for them.</p>
+      <p>Traditional payment systems assume a human at every endpoint. They have human-friendly interfaces, human-friendly dispute mechanisms, human-friendly fraud rules. They are slow, expensive, and incompatible with the speed and scale at which agents operate.</p>
+      <p>The first generation of crypto rails — ETH, USDC, basic ERC-20 tokens — solved part of the problem. They removed human bottlenecks from settlement. But they did not address the hardest problem in agent commerce: <strong>trust without humans in the loop</strong>.</p>
+      <p>When a human pays a contractor, dispute resolution involves reputation, courts, social capital, and recourse. When an agent pays another agent for work, none of that exists. The agent has no reputation a court would recognize. There is no social capital between two software processes. The recourse mechanisms are reduced to the cryptographic guarantees of the underlying rails.</p>
+      <p>Zylogen is an answer to this. It treats agent-to-agent and agent-to-human commerce as a first-class problem, with mechanisms designed to make trust verifiable, settlement deterministic, and reputation economically meaningful.</p>
+    </section>
+
+    <div class="wp-divider"></div>
+
+    <!-- 2. THE PROTOCOL -->
+    <section id="s2">
+      <span class="wp-sec-num">// 02</span>
+      <h2>The Protocol</h2>
+      <p>Zylogen consists of four contracts. Each addresses a specific failure mode in current agent-payment infrastructure.</p>
+
+      <h3>2.1 ZYL — the native token</h3>
+      <p>ZYL is a fixed-supply ERC-20 deployed on Base. It serves as the gas, the reputation collateral, and the settlement-fee currency of the protocol.</p>
+      <p><strong>Supply:</strong> 1,000,000,000 ZYL, fixed at deployment. No mint function exists. There is no admin key with minting authority, now or ever. The contract has no pause function. These are not features that may be added later — their absence is enforced at the bytecode level.</p>
+      <p><strong>Burns:</strong> All deflation operates through the ERC-20 <code>_burn</code> function exclusively. Tokens sent to the dead address (<code>0x0...dEaD</code>) do not reduce total supply; they merely become inaccessible. Zylogen does not use that pattern. Every burn permanently reduces <code>totalSupply()</code>, verifiable on-chain.</p>
+
+      <h4>Allocation</h4>
+      <table>
+        <thead>
+          <tr>
+            <th>Allocation</th>
+            <th style="text-align:right">Percentage</th>
+            <th style="text-align:right">Tokens</th>
+            <th>Vesting</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Community &amp; staking rewards</td>
+            <td class="td-r">40%</td>
+            <td class="td-r">400,000,000</td>
+            <td>8-year emission via SparkStaking</td>
+          </tr>
+          <tr>
+            <td>Protocol treasury</td>
+            <td class="td-r">20%</td>
+            <td class="td-r">200,000,000</td>
+            <td>7-day timelock + multisig</td>
+          </tr>
+          <tr>
+            <td>Team &amp; founders</td>
+            <td class="td-r">15%</td>
+            <td class="td-r">150,000,000</td>
+            <td>4-year linear, 12-month cliff</td>
+          </tr>
+          <tr>
+            <td>Initial liquidity</td>
+            <td class="td-r">15%</td>
+            <td class="td-r">150,000,000</td>
+            <td>LP locked 24 months</td>
+          </tr>
+          <tr>
+            <td>Ecosystem grants</td>
+            <td class="td-r">10%</td>
+            <td class="td-r">100,000,000</td>
+            <td>3-year discretionary pool</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>There is no presale. There is no private allocation outside the team vest. There is no insider round.</p>
+
+      <h4>Burn paths</h4>
+      <ol>
+        <li><strong>0.5% of every successful settlement</strong> (floor; higher for low-reputation agents)</li>
+        <li><strong>100% of all slashed agent bonds</strong> — no insurance pool, pure deflation</li>
+        <li><strong>Voluntary reputation-burns</strong> (Phase 5 feature)</li>
+      </ol>
+
+      <h3>2.2 TaskEscrowV2 — deterministic settlement</h3>
+      <p>TaskEscrowV2 is an upgrade to the production V1 contract. It introduces three properties that V1 did not have:</p>
+      <p><strong>Crystallized fees.</strong> When a client locks funds for an agent, the fee is calculated and stored at that moment, in the escrow struct. It cannot be changed by the oracle, by a parameter update, or by a reputation change between lock and settlement. The client and worker know exactly what they signed.</p>
+      <p><strong>Eleven-tier fee table.</strong> Reputation maps to fees through a discrete lookup table, not a continuous formula. This eliminates a class of fixed-point math vulnerabilities and makes the fee curve auditable at a glance.</p>
+
+      <table>
+        <thead>
+          <tr><th>Reputation tier</th><th style="text-align:right">Fee</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>0 (rep 0–999)</td><td class="td-r">2.00%</td></tr>
+          <tr><td>1 (rep 1000–1999)</td><td class="td-r">1.75%</td></tr>
+          <tr><td>2 (rep 2000–2999)</td><td class="td-r">1.50%</td></tr>
+          <tr><td>3 (rep 3000–3999)</td><td class="td-r">1.30%</td></tr>
+          <tr><td>4 (rep 4000–4999)</td><td class="td-r">1.10%</td></tr>
+          <tr><td>5 (rep 5000–5999)</td><td class="td-r">0.95%</td></tr>
+          <tr><td>6 (rep 6000–6999)</td><td class="td-r">0.80%</td></tr>
+          <tr><td>7 (rep 7000–7999)</td><td class="td-r">0.70%</td></tr>
+          <tr><td>8 (rep 8000–8999)</td><td class="td-r">0.60%</td></tr>
+          <tr><td>9 (rep 9000–9999)</td><td class="td-r">0.55%</td></tr>
+          <tr><td>10 (rep 10000)</td><td class="td-r">0.50%</td></tr>
+        </tbody>
+      </table>
+
+      <p>The fee is always split: 0.5% to burn, 0.5% to treasury, the remainder to the staking reward pool. High-reputation agents pay near the floor. Reputation-zero agents pay the ceiling.</p>
+      <p><strong>Three settlement paths only.</strong> TaskEscrowV2 has exactly three exit functions: <code>settle</code>, <code>refund</code>, and <code>timeout</code>. It does not have a <code>release</code> function. There is no path that bypasses fees or burns.</p>
+      <ul>
+        <li><strong>Settle:</strong> oracle-attested successful completion → worker receives funds, fees are paid, ZYL is burned</li>
+        <li><strong>Refund:</strong> oracle-approved cancellation → client receives funds, no fees, no burn</li>
+        <li><strong>Timeout:</strong> permissionless after 30 days of oracle inactivity → worker receives funds, floor burn (0.5%) fires regardless</li>
+      </ul>
+      <p>The timeout path guarantees that workers who complete tasks during oracle outages still receive payment, and that protocol burns are never optional.</p>
+
+      <h3>2.3 SparkStaking — forced utility</h3>
+      <p>Holding ZYL is not enough. Staking is.</p>
+      <p>Users stake ZYL into SparkStaking and receive Spark, a non-transferable accounting unit. Spark cannot be sold, traded, or moved between addresses. It exists only as a balance derived from staked ZYL.</p>
+      <p><strong>Sponsorship.</strong> Spark holders can delegate Spark to specific agents. While an agent has Spark balance ≥ task cost, that agent pays zero protocol fees. This creates a patron economy: stakers who believe in an agent subsidize that agent's operations and earn pro-rata rewards from the agent's settled escrows.</p>
+      <p><strong>Anti-flash-loan mechanics.</strong> Spark requires a 24-hour activation period after staking. Each new stake creates an independent batch with its own activation timestamp. Same-block stake-and-use exploits are impossible by construction.</p>
+      <p><strong>Immediate deactivation on unstake.</strong> When a user calls <code>unstake</code>, their Spark deactivates in the same block, before the 7-day cooldown begins. There is no path where Spark continues earning rewards while ZYL is in withdrawal.</p>
+      <p><strong>Pull-over-push rewards.</strong> Sponsors claim rewards from settled escrows lazily, via a <code>cumulativeRewardPerSpark</code> accumulator. Settlement is O(1) regardless of sponsor count. There is no path where a popular agent's settlement runs out of gas.</p>
+
+      <h3>2.4 AgentID — soulbound identity</h3>
+      <p>Each agent on Zylogen is bonded to a unique AgentID NFT. The NFT is soulbound while ZYL is bonded to it: it cannot be transferred while operational.</p>
+      <p><strong>Bonding requirement.</strong> To operate on Zylogen, an agent's owner must bond a minimum amount of ZYL to the AgentID. This bond is at risk: if the agent breaches escrow obligations and is slashed by the oracle, a portion of the bond is destroyed.</p>
+      <p><strong>48-hour dispute window.</strong> Slashing is not instant. When the oracle initiates a slash, it snapshots the current owner of the AgentID and starts a 48-hour dispute window. Transfers of the NFT are blocked during this window. Unbonding is blocked. At finalization, slashed ZYL is destroyed (100% burn) and the affected agent's Spark delegations are zeroed automatically.</p>
+      <p><strong>Reputation as economic state.</strong> An AgentID's reputation is on-chain. It is updated by a separate oracle key (distinct from the settlement key), with rate limits (±200 reputation points per 24 hours per agent) and a 6-hour activation delay. Reputation changes affect future escrows, not in-flight ones.</p>
+      <p>The trust surface of any agent on Zylogen is therefore the sum of:</p>
+<pre>Trust(agent) = bonded ZYL                  (skin in own game)
+             + delegated Spark              (skin from supporters with upside)
+             + oracle-attested track record (verifiable performance)</pre>
+      <p>Each component is on-chain, verifiable, and economically meaningful.</p>
+    </section>
+
+    <div class="wp-divider"></div>
+
+    <!-- 3. FLYWHEEL -->
+    <section id="s3">
+      <span class="wp-sec-num">// 03</span>
+      <h2>The Economic Flywheel</h2>
+      <p>The four contracts compose into a single economic loop.</p>
+<pre>User stakes ZYL ──┐
+                  ▼
+SparkStaking ──── delegates Spark ───► Agent
+▲                                        │
+│ rewards (pull-over-push)               │ executes
+│                                        ▼
+└────── 0.9% pool ◄──── TaskEscrowV2.settle()
+                │
+     ┌──────────┼──────────┐
+     ▼          ▼          ▼
+BURN 0.5%  Treasury 0.5%  Spark Pool
+(supply ↓)  (operations)   (0–1.0%)</pre>
+
+      <h4>Loop dynamics</h4>
+      <ol>
+        <li>More escrows → more burns → less supply → upward price pressure on remaining tokens</li>
+        <li>More usage → more demand for Spark → more ZYL locked → less circulating supply</li>
+        <li>Better agents earn lower fees → users prefer high-reputation agents → reputation becomes valuable → more bonded ZYL</li>
+        <li>Higher bonds → higher trust → more enterprise usage → more escrows → loop accelerates</li>
+      </ol>
+      <p>The system has no emissions outside the 8-year community pool. It has no founder taxes. It has no treasury minting. Every ZYL that exists today will exist or be burned. There is no third path.</p>
+    </section>
+
+    <div class="wp-divider"></div>
+
+    <!-- 4. DESIGN PRINCIPLES -->
+    <section id="s4">
+      <span class="wp-sec-num">// 04</span>
+      <h2>Design Principles</h2>
+      <p>The protocol's architecture reflects three principles. They are non-negotiable.</p>
+
+      <h3>4.1 Forced utility</h3>
+      <p>Holding ZYL must be required to operate, not merely useful. An agent that wishes to bypass ZYL by transacting outside Zylogen is welcome to. An agent that wishes to use Zylogen must hold, stake, or earn ZYL. The token is infrastructure, not a permission slip.</p>
+      <p>This is the core differentiation from "AI + crypto" tokens that are tokens looking for utility. ZYL is utility looking for a token, and finding one with sound monetary properties.</p>
+
+      <h3>4.2 Sound money</h3>
+      <p>Fixed supply. No mint. No pause. Burns are real (<code>_burn</code>, not transfer-to-dead). Allocations are public. Vesting is on-chain. Multisig controls the parameters that must be governable and renounces ownership of the parameters that must be immutable.</p>
+      <p>Inflation is not a fundraising tool. Treasury withdrawals are timelocked. The team's tokens vest over four years with a one-year cliff, in a smart contract anyone can audit.</p>
+      <p>If a token claims to be sound money but its operator can mint at will, it is not sound money. ZYL was designed for adversarial inspection.</p>
+
+      <h3>4.3 Verifiable performance</h3>
+      <p>Every burn is earned. Every reward is merited. Every slash is challengeable.</p>
+      <p>Every fee paid corresponds to a settled escrow with on-chain evidence. Every Spark reward distributed maps to a specific agent and a specific settlement. Every slashed bond passes through a 48-hour dispute window before destruction.</p>
+      <p>Reputation is not a centralized scorecard maintained by the team. It is on-chain state, updated by a separate oracle key, rate-limited, delayed, and bounded by track record. It cannot be manipulated by a single key holder, even by the project team.</p>
+    </section>
+
+    <div class="wp-divider"></div>
+
+    <!-- 5. THREAT MODEL -->
+    <section id="s5">
+      <span class="wp-sec-num">// 05</span>
+      <h2>Threat Model</h2>
+      <p>The protocol was designed adversarially. Before any production code was written, the architecture passed a Pass 1 adversarial review identifying 26 vulnerability classes across smart contract, governance, oracle, and Layer 2 surfaces. Each vector was resolved at the specification level.</p>
+      <p>A non-exhaustive sample of resolved threats:</p>
+
+      <table>
+        <thead>
+          <tr><th>Vector</th><th>Mitigation</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Allowance-chain <code>burnFrom</code> abuse</td>
+            <td><code>burnFrom</code> reverts unconditionally; whitelisted contracts burn own balance only</td>
+          </tr>
+          <tr>
+            <td>Oracle key compromise</td>
+            <td>Three separate keys (settlement, reputation, slashing); rate-limited reputation updates with 6-hour delay</td>
+          </tr>
+          <tr>
+            <td>Flash-loan Spark farming</td>
+            <td>Snapshot-based Spark with mandatory 24-hour activation per stake batch</td>
+          </tr>
+          <tr>
+            <td>Slash transfer evasion</td>
+            <td>Owner-of-record snapshotted at slash initiation; transfers blocked during dispute</td>
+          </tr>
+          <tr>
+            <td>Logarithmic fee curve math errors</td>
+            <td>Replaced with discrete 11-tier lookup; zero fixed-point arithmetic</td>
+          </tr>
+          <tr>
+            <td>Total supply invariant violation</td>
+            <td><code>_burn</code> exclusively; <code>transfer(0xdEaD)</code> banned from codebase</td>
+          </tr>
+          <tr>
+            <td>Reputation rug between lock and settle</td>
+            <td>All fee parameters crystallized at lock time, immutable through settlement</td>
+          </tr>
+          <tr>
+            <td>Multi-sponsor reward gas explosion</td>
+            <td>Pull-over-push pattern with <code>cumulativeRewardPerSpark</code>; max 500 sponsors per agent</td>
+          </tr>
+          <tr>
+            <td>Sequencer MEV on initial liquidity</td>
+            <td>Private mempool (Flashbots Protect) for LP seeding</td>
+          </tr>
+          <tr>
+            <td>Atomic deployment failure</td>
+            <td>Factory contract; ZYL never sits in a bare EOA</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>The full threat resolution matrix and verification suite is published at <code>docs/zyl-genesis/THREAT_RESOLUTION.md</code> in the public repository.</p>
+      <p>The codebase is currently tagged <code>v2.0.0-pre-audit</code>. Two independent audits are scheduled before mainnet deployment of the new contracts. Mainnet deployment is hard-gated by the <code>AUDIT_PASSED=true</code> environment flag in the deploy script. The script does not run otherwise.</p>
+    </section>
+
+    <div class="wp-divider"></div>
+
+    <!-- 6. WHY BASE -->
+    <section id="s6">
+      <span class="wp-sec-num">// 06</span>
+      <h2>Why Base</h2>
+      <p>Zylogen is deployed on Base for four reasons:</p>
+      <p><strong>Cost.</strong> A typical lock-and-settle round-trip on Zylogen costs approximately 393,000 gas. On Base at typical fees, this prices at well under one cent per escrow. On Ethereum L1, the same operation would cost dollars. Agent economics require sub-cent settlement.</p>
+      <p><strong>Composability.</strong> Base is part of the Optimism Superchain. Liquidity on Aerodrome. USDC native. Coinbase backing. Hundreds of consumer apps already on the chain. The agent ecosystem is forming on Base.</p>
+      <p><strong>Speed.</strong> Base produces blocks every two seconds. Settlement happens within human-perceptual latency. Agent loops do not need to wait.</p>
+      <p><strong>Sovereignty within standards.</strong> Base uses standard EVM tooling. Zylogen contracts can be audited by anyone with Solidity expertise. There is no novel cryptography, no proprietary VM, no team-controlled bridge.</p>
+      <p>We are not multi-chain. We have no plans to be. Multi-chain is a strategic admission that one chain is not enough — Zylogen's bet is the opposite. Base is enough. Depth beats breadth.</p>
+    </section>
+
+    <div class="wp-divider"></div>
+
+    <!-- 7. ROADMAP -->
+    <section id="s7">
+      <span class="wp-sec-num">// 07</span>
+      <h2>Roadmap</h2>
+      <p>Zylogen is shipping in five phases. Each phase has a hard gate; phases do not run in parallel.</p>
+
+      <h3>Phase 0 — Pre-deploy (current)</h3>
+      <ul>
+        <li>Multisig signers onboarded (5 hardware wallets)</li>
+        <li>Hardware key ceremony for separate oracle keys</li>
+        <li>Audit #1 commissioned (ZYL.sol, TaskEscrowV2.sol, SparkStaking.sol)</li>
+        <li>Audit #2 scheduled (AgentID.sol)</li>
+        <li>Bug bounty live on Immunefi</li>
+      </ul>
+
+      <h3>Phase 1 — Genesis</h3>
+      <ul>
+        <li>Deploy ZYL via atomic factory</li>
+        <li>LP seeded on Aerodrome via private mempool, locked 24 months</li>
+        <li>Public claim opens for Spark staking</li>
+      </ul>
+
+      <h3>Phase 2 — Settlement migration</h3>
+      <ul>
+        <li>TaskEscrowV2 deployed</li>
+        <li>V1 cutover announced (30-day notice)</li>
+        <li>Burn-on-settle live; <code>totalSupply()</code> decreases visible on BaseScan</li>
+      </ul>
+
+      <h3>Phase 3 — Spark active</h3>
+      <ul>
+        <li>SparkStaking opens to the public</li>
+        <li>Minimum stake 1,000 ZYL</li>
+        <li>First reward distributions begin</li>
+      </ul>
+
+      <h3>Phase 4 — Agent identity</h3>
+      <ul>
+        <li>AgentID NFTs deployed</li>
+        <li>Existing Nova agent migrated to bonded model</li>
+        <li>Slashing activated with 48-hour dispute window</li>
+      </ul>
+
+      <h3>Phase 5 — Proof-of-Burn (forward-looking)</h3>
+      <p>A black-swan feature designed and threat-modeled but deferred to post-launch: any address can voluntarily burn ZYL on behalf of an agent to provide a non-custodial vote of confidence, capped at reputation tier 4 (preventing whales from buying tier 10). The full design is documented at <code>docs/zyl-genesis/PASS_3_PROOF_OF_BURN.md</code>.</p>
+    </section>
+
+    <div class="wp-divider"></div>
+
+    <!-- 8. WHAT WE ARE NOT -->
+    <section id="s8">
+      <span class="wp-sec-num">// 08</span>
+      <h2>What We Are Not</h2>
+      <p>Zylogen is not a chain. It does not require a new wallet, a new asset standard, or a new VM. It is a settlement protocol on Base.</p>
+      <p>Zylogen is not a wallet. We do not custody user funds. The escrow contract holds funds in trust for the duration of a task; users hold their own keys.</p>
+      <p>Zylogen is not a marketplace. We do not match clients with workers. We provide the settlement rail; matching happens in agent platforms built on top.</p>
+      <p>Zylogen is not a DAO. Governance is intentionally minimized. The multisig controls only what cannot be made immutable. The token does not vote on protocol parameters.</p>
+      <p>Zylogen is not a memecoin. ZYL has cash flow (fee revenue), redemption value (slashed bonds), and a measurable supply curve (verifiable burns). It can be modeled. It can be valued.</p>
+      <p>Zylogen is not a substitute for human connection or human judgment. Agents are tools, useful within their domain. The protocol exists because tools need infrastructure too.</p>
+    </section>
+
+    <div class="wp-divider"></div>
+
+    <!-- 9. THE TEAM + CLOSING -->
+    <section id="s9">
+      <span class="wp-sec-num">// 09</span>
+      <h2>The Team</h2>
+      <p>Zylogen was founded and is currently led by a single builder operating publicly under the handle Wichi (<a href="https://x.com/ZylogenProtocol" target="_blank" rel="noreferrer"><code>@ZylogenProtocol</code></a> on X, <a href="https://warpcast.com/zylogen" target="_blank" rel="noreferrer"><code>@zylogen</code></a> on Farcaster). The protocol has been built in the open, with every commit visible at <a href="https://github.com/elwichito/zylogen-protocol" target="_blank" rel="noreferrer"><code>github.com/elwichito/zylogen-protocol</code></a>.</p>
+      <p>The team is intentionally small. Zylogen is structured to function as a public good once mainnet contracts are deployed and ownership is renounced — most of the long-term work is community work, not founder work. The multisig will include external signers from the Base security ecosystem, named publicly before launch.</p>
+
+      <div class="wp-divider"></div>
+
+      <span class="wp-sec-num">// 10</span>
+      <h2>Closing</h2>
+      <p>The machine economy is being built right now, by people who do not yet have the infrastructure they need. Zylogen is one part of that infrastructure: the settlement layer.</p>
+      <p>We do not believe agents will replace human commerce. We believe they will augment it, transact alongside it, and increasingly transact with each other. When that happens — and it is happening — they will need money that works the way they do: instantaneous, verifiable, programmatic, sound.</p>
+      <p><strong>ZYL is that money.</strong></p>
+    </section>
+
+    <!-- ASCII MONOLITH -->
+    <div class="wp-monolith">
+<pre class="ascii-art">                                ▲
+                               ▲ ▲
+                              ▲   ▲
+                             ▲     ▲
+                            ▲   🜂   ▲
+                            ▲       ▲
+                            ▲▲▲▲▲▲▲▲▲</pre>
+      <div class="wp-monolith-closing">Sound money for the machine economy.</div>
+    </div>
+
+    <!-- DOCUMENT REFS -->
+    <div class="wp-refs">
+      <div class="wp-refs-label">DOCUMENT INFORMATION</div>
+      <div class="wp-ref-row">
+        <span class="wp-ref-key">Repository</span>
+        <span class="wp-ref-val"><a href="https://github.com/elwichito/zylogen-protocol" target="_blank" rel="noreferrer">github.com/elwichito/zylogen-protocol</a></span>
+      </div>
+      <div class="wp-ref-row">
+        <span class="wp-ref-key">Tag</span>
+        <span class="wp-ref-val">v2.0.0-pre-audit</span>
+      </div>
+      <div class="wp-ref-row">
+        <span class="wp-ref-key">Live V1</span>
+        <span class="wp-ref-val"><a href="https://basescan.org/address/0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f" target="_blank" rel="noreferrer">0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f (Base Mainnet)</a></span>
+      </div>
+      <div class="wp-ref-row">
+        <span class="wp-ref-key">Web</span>
+        <span class="wp-ref-val"><a href="https://zylogen.xyz">zylogen.xyz</a></span>
+      </div>
+      <div class="wp-ref-row">
+        <span class="wp-ref-key">Social</span>
+        <span class="wp-ref-val">
+          <a href="https://x.com/ZylogenProtocol" target="_blank" rel="noreferrer">@ZylogenProtocol (X)</a>
+          &nbsp;·&nbsp;
+          <a href="https://warpcast.com/zylogen" target="_blank" rel="noreferrer">@zylogen (Farcaster)</a>
+        </span>
+      </div>
+      <div class="wp-ref-row">
+        <span class="wp-ref-key">Note</span>
+        <span class="wp-ref-note">This document is a living specification. The canonical version is the most recent commit in the repository. Audits, addendums, and protocol updates will be appended as separate signed documents. <em>Zylogen Protocol, 2026.</em></span>
+      </div>
+    </div>
+
+  </div><!-- /wp-article -->
+</div><!-- /wp-container -->
+</main>
+
+<!-- ═══ FOOTER (identical to landing) ═══════════════════════════════════════ -->
+<footer>
+  <div class="footer-main">
+    <div class="footer-brand">
+      <div class="footer-logo">ZYLOGEN.PROTOCOL</div>
+      <p class="footer-desc">The autonomic settlement layer for AI-to-AI and AI-to-Human payments. Escrow-protected. On-chain reputation. Built on Base.</p>
+    </div>
+    <div class="footer-col">
+      <h5>PROTOCOL</h5>
+      <a href="/#how">How It Works</a>
+      <a href="/#nova" style="color:var(--cyan)">Nova — First Agent</a>
+      <a href="/#destinations">Protocol Zones</a>
+      <a href="/#paywall">402 Paywall</a>
+      <a href="/#reputation">Reputation</a>
+    </div>
+    <div class="footer-col">
+      <h5>DEVELOPERS</h5>
+      <a href="https://github.com/elwichito/zylogen-protocol" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="https://basescan.org/address/0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f" target="_blank" rel="noreferrer">Basescan</a>
+      <a href="/whitepaper">Whitepaper</a>
+      <a href="/#architecture">Architecture</a>
+    </div>
+    <div class="footer-col">
+      <h5>COMMUNITY</h5>
+      <a href="https://x.com/zylogenprotocol" target="_blank" rel="noreferrer">X / Twitter</a>
+      <a href="https://warpcast.com/zylogen" target="_blank" rel="noreferrer">Farcaster</a>
+      <a href="/#roadmap">Roadmap</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="footer-copy">© 2026 ZYLOGEN PROTOCOL — ALL RIGHTS RESERVED</div>
+    <div class="footer-legal">
+      <a href="https://github.com/elwichito/zylogen-protocol" target="_blank" rel="noreferrer">TERMS</a>
+      <a href="https://github.com/elwichito/zylogen-protocol" target="_blank" rel="noreferrer">PRIVACY</a>
+      <a href="https://github.com/elwichito/zylogen-protocol" target="_blank" rel="noreferrer">SECURITY</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
