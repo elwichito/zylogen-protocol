@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       { source: '/whitepaper', destination: '/whitepaper/index.html' },
+      { source: '/whitepaper/', destination: '/whitepaper/index.html' },
     ];
   },
   env: {
