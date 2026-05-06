@@ -13,10 +13,10 @@ type CryptoState = "idle" | "approving" | "locking" | "confirming" | "done" | "e
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
 
-// ─── Contract addresses (Base Mainnet) ──────────────────────────────────────
-const TASK_ESCROW = "0xBE464859Fb6f09fa93b6212f616F3AD19ebe48B1" as const;
-const USDC_BASE   = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
-const NOVA_WORKER = "0x9e80b1aa9c7C2a8B875CC569D8E30cEfB364c9aD" as const;
+// ─── Contract addresses (from env, with mainnet defaults) ───────────────────
+const TASK_ESCROW = (process.env.NEXT_PUBLIC_TASK_ESCROW_ADDRESS ?? "0xBE464859Fb6f09fa93b6212f616F3AD19ebe48B1") as `0x${string}`;
+const USDC_BASE   = (process.env.NEXT_PUBLIC_USDC_ADDRESS ?? "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913") as `0x${string}`;
+const NOVA_WORKER = (process.env.NEXT_PUBLIC_NOVA_WORKER_ADDRESS ?? "0x9e80b1aa9c7C2a8B875CC569D8E30cEfB364c9aD") as `0x${string}`;
 const LOCK_AMOUNT = BigInt(9_000_000); // $9.00 USDC (6 decimals)
 const DEADLINE_S  = 24 * 3600;
 

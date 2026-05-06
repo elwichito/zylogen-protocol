@@ -8,8 +8,10 @@
 const express = require("express");
 const Stripe  = require("stripe");
 const db      = require("../db/sqlite");
+const { nova: log } = require("../lib/logger");
 const { processClientMessage } = require("../agents/novaBrain");
 const { releasePayment }       = require("../services/paymentRelay");
+const { sendPaymentConfirmedEmail, sendKitDeliveredEmail } = require("../services/email");
 
 const router = express.Router();
 
@@ -46,7 +48,7 @@ router.post("/checkout", async (req, res) => {
     return res.status(410).json({ error: "sold_out" });
   }
 
-  console.log(`[nova/checkout] Incoming → wallet=${walletAddress} email=${email || "(none)"}`);
+  log.info({ wallet: walletAddress, email: email || null }, "Checkout initiated");
 
   try {
     const session = await getStripe().checkout.sessions.create({
@@ -70,10 +72,10 @@ router.post("/checkout", async (req, res) => {
       cancel_url:  `${process.env.FRONTEND_URL}/nova?payment=cancelled`,
     });
 
-    console.log(`[nova/checkout] STRIPE_HANDSHAKE_SUCCESS — session=${session.id} client_reference_id=${walletAddress} → ${session.url.split("?")[0]}`);
+    log.info({ sessionId: session.id, wallet: walletAddress }, "Stripe session created");
     res.json({ checkoutUrl: session.url });
   } catch (err) {
-    console.error("[nova/checkout]", err);
+    log.error({ err, wallet: walletAddress }, "Checkout session creation failed");
     res.status(500).json({ error: "Could not create checkout session" });
   }
 });
@@ -100,7 +102,7 @@ router.post("/message", async (req, res) => {
   try {
     const result = await processClientMessage(email, message.trim());
 
-    // Trigger on-chain settlement when kit is delivered for the first time
+    // Trigger on-chain settlement and send email when kit is delivered for the first time
     if (result.stage === "kit_delivered") {
       const record = db.prepare(
         `SELECT escrow_id FROM escrow_records WHERE client_email = ? AND status = 'locked' LIMIT 1`
@@ -108,14 +110,19 @@ router.post("/message", async (req, res) => {
 
       if (record?.escrow_id) {
         releasePayment(record.escrow_id, email).catch((err) =>
-          console.error("[nova/message] releasePayment failed:", err.message)
+          log.error({ err, email, escrowId: record.escrow_id }, "Release payment failed")
         );
       }
+
+      // Send kit delivered email (fire-and-forget)
+      sendKitDeliveredEmail(email, result.kit || null).catch((err) =>
+        log.error({ err, email }, "Kit delivered email failed")
+      );
     }
 
     res.json(result);
   } catch (err) {
-    console.error("[nova/message]", err);
+    log.error({ err, email }, "Nova message processing failed");
     res.status(500).json({ error: "Nova encountered an error." });
   }
 });
@@ -167,12 +174,80 @@ router.post("/verify-payment", async (req, res) => {
       INSERT OR IGNORE INTO nova_sessions (client_email) VALUES (?)
     `).run(email);
 
-    console.log(`[nova/verify-payment] WALLET_PAYMENT_VERIFIED — email=${email} wallet=${walletAddress} tx=${txHash}`);
+    log.info({ email, wallet: walletAddress, txHash }, "Wallet payment verified");
+
+    // Send payment confirmation email (fire-and-forget)
+    sendPaymentConfirmedEmail(email, "crypto").catch((err) =>
+      log.error({ err, email }, "Payment confirmation email failed")
+    );
+
     res.json({ ok: true });
   } catch (err) {
-    console.error("[nova/verify-payment]", err);
+    log.error({ err, email, wallet: walletAddress }, "Payment verification failed");
     res.status(500).json({ error: "Could not verify payment" });
   }
+});
+
+// ─── POST /api/nova/deliver-kit — admin endpoint to deliver kit + release escrow ───
+
+router.post("/deliver-kit", async (req, res) => {
+  // Admin API key auth
+  const adminKey = req.headers["x-admin-key"];
+  if (!adminKey || adminKey !== process.env.ADMIN_API_KEY) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+
+  const { email, kit } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: "email required" });
+  }
+  if (!kit || typeof kit !== "object") {
+    return res.status(400).json({ error: "kit (JSON object) required" });
+  }
+
+  // Check session exists
+  const session = db.prepare(
+    `SELECT id FROM nova_sessions WHERE client_email = ?`
+  ).get(email);
+
+  if (!session) {
+    return res.status(404).json({ error: "session not found" });
+  }
+
+  // Update nova_sessions with kit delivery
+  db.prepare(`
+    UPDATE nova_sessions
+    SET branding_kit = ?, delivery_status = 'delivered', stage = 'kit_delivered', updated_at = CURRENT_TIMESTAMP
+    WHERE client_email = ?
+  `).run(JSON.stringify(kit), email);
+
+  log.info({ email }, "Kit delivered");
+
+  // Release escrow payment
+  let released = false;
+  const record = db.prepare(
+    `SELECT escrow_id FROM escrow_records WHERE client_email = ? AND status = 'locked' LIMIT 1`
+  ).get(email);
+
+  if (record?.escrow_id) {
+    try {
+      await releasePayment(record.escrow_id, email);
+      released = true;
+      log.info({ email, escrowId: record.escrow_id }, "Escrow released");
+    } catch (err) {
+      log.error({ err, email, escrowId: record.escrow_id }, "Escrow release failed");
+    }
+  } else {
+    log.warn({ email }, "No locked escrow found for kit delivery");
+  }
+
+  // Send kit delivered notification email (fire-and-forget)
+  sendKitDeliveredEmail(email, kit).catch((err) =>
+    log.error({ err, email }, "Kit delivery email failed")
+  );
+
+  res.json({ success: true, released });
 });
 
 // ─── GET /api/nova/status ─────────────────────────────────────────────────────

@@ -26,8 +26,8 @@ async function deployFixture() {
   const MockERC20 = await ethers.getContractFactory("MockERC20");
   const usdc = await MockERC20.deploy("USD Coin", "USDC", 6);
 
-  // Deploy TaskEscrowV2
-  const TaskEscrowV2 = await ethers.getContractFactory("TaskEscrowV2");
+  // Deploy TaskEscrowV2 (Phase 1 USDC-only escrow, not zyl/TaskEscrowV2)
+  const TaskEscrowV2 = await ethers.getContractFactory("contracts/TaskEscrowV2.sol:TaskEscrowV2");
   const escrow = await TaskEscrowV2.deploy(await usdc.getAddress(), oracle.address);
 
   // Mint USDC to client and attacker

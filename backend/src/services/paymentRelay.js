@@ -18,6 +18,8 @@
 const Stripe = require("stripe");
 const { ethers } = require("ethers");
 const db = require("../db/sqlite");
+const { payment: log, webhook: webhookLog } = require("../lib/logger");
+const { sendPaymentConfirmedEmail } = require("./email");
 
 const FOUNDING_100_PRICE_CENTS = 999; // $9.99
 
@@ -121,7 +123,7 @@ async function relayPaymentToEscrow(clientAddress, customerEmail, stripeSessionI
       VALUES (?, ?)
     `).run(customerEmail, stripeSessionId);
 
-    console.log(`[paymentRelay] DRY RUN — wrote mock record taskId=${mockTaskId}`);
+    log.info({ taskId: mockTaskId, email: customerEmail, dryRun: true }, "DRY RUN: Mock escrow record created");
     return { taskId: mockTaskId, txHash: mockTxHash, dryRun: true };
   }
   // ── END DRY RUN ───────────────────────────────────────────────────────────
@@ -136,7 +138,7 @@ async function relayPaymentToEscrow(clientAddress, customerEmail, stripeSessionI
   if (allowance < USDC_LOCK_AMOUNT) {
     const approveTx = await usdc.approve(TASK_ESCROW_ADDRESS, USDC_LOCK_AMOUNT);
     await approveTx.wait();
-    console.log(`[paymentRelay] USDC approved for ${TASK_ESCROW_ADDRESS}`);
+    log.info({ escrow: TASK_ESCROW_ADDRESS }, "USDC spending approved");
   }
 
   // 2. Generate deterministic taskId and deadline
@@ -171,7 +173,7 @@ async function relayPaymentToEscrow(clientAddress, customerEmail, stripeSessionI
     VALUES (?, ?)
   `).run(customerEmail, stripeSessionId);
 
-  console.log(`[paymentRelay] Locked task #${taskId} for ${customerEmail} | tx: ${receipt.hash}`);
+  log.info({ taskId, email: customerEmail, txHash: receipt.hash }, "Task locked on-chain");
   return { taskId, txHash: receipt.hash };
 }
 
@@ -190,13 +192,13 @@ async function releasePayment(escrowId, email) {
     db.prepare(`
       UPDATE escrow_records SET status = 'released' WHERE client_email = ? AND escrow_id = ?
     `).run(email, escrowId);
-    console.log(`[paymentRelay] DRY RUN — released escrow ${escrowId} for ${email}`);
+    log.info({ escrowId, email, dryRun: true }, "DRY RUN: Escrow released");
     return { released: true, dryRun: true };
   }
 
   // Skip if escrowId is a mock from DRY_RUN
   if (!escrowId || escrowId.startsWith("DRY-")) {
-    console.warn(`[paymentRelay] releasePayment skipped — escrowId is a tx hash or mock: ${escrowId}`);
+    log.warn({ escrowId, email }, "Release skipped - escrowId is mock or tx hash");
     db.prepare(`
       UPDATE escrow_records SET status = 'released' WHERE client_email = ? AND escrow_id = ?
     `).run(email, escrowId);
@@ -213,7 +215,7 @@ async function releasePayment(escrowId, email) {
     UPDATE escrow_records SET status = 'released' WHERE client_email = ? AND escrow_id = ?
   `).run(email, escrowId);
 
-  console.log(`[paymentRelay] Released escrow #${escrowId} for ${email} | tx: ${receipt.hash}`);
+  log.info({ escrowId, email, txHash: receipt.hash }, "Escrow released on-chain");
   return { released: true, txHash: receipt.hash };
 }
 
@@ -239,7 +241,7 @@ async function handleStripeWebhook(req, res) {
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    console.error("[paymentRelay] Bad webhook signature:", err.message);
+    webhookLog.error({ err }, "Invalid webhook signature");
     return res.status(400).json({ error: "Invalid signature" });
   }
 
@@ -259,7 +261,7 @@ async function handleStripeWebhook(req, res) {
   }
 
   if (!clientWallet || !ethers.isAddress(clientWallet)) {
-    console.warn(`[paymentRelay] Missing or invalid client wallet in session ${session.id}`);
+    webhookLog.warn({ sessionId: session.id, email }, "Missing or invalid client wallet");
     // Still record the payment — can be manually reconciled
     db.prepare(`
       INSERT OR IGNORE INTO escrow_records
@@ -279,8 +281,15 @@ async function handleStripeWebhook(req, res) {
 
   try {
     await relayPaymentToEscrow(clientWallet, email, session.id);
+
+    // Send payment confirmation email (fire-and-forget, don't block webhook response)
+    if (email) {
+      sendPaymentConfirmedEmail(email, "stripe").catch((err) =>
+        webhookLog.error({ err, email }, "Payment confirmation email failed")
+      );
+    }
   } catch (err) {
-    console.error("[paymentRelay] on-chain relay failed:", err.message);
+    webhookLog.error({ err, sessionId: session.id, email }, "On-chain relay failed");
     // Record the failure for manual retry — do NOT let Stripe retry (return 200)
     db.prepare(`
       INSERT OR IGNORE INTO escrow_records
