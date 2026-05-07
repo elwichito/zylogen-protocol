@@ -85,6 +85,8 @@ const loggers = {
   payment: logger.child({ module: "payment" }),
   email: logger.child({ module: "email" }),
   webhook: logger.child({ module: "webhook" }),
+  health: logger.child({ module: "health" }),
+  retry: logger.child({ module: "retry" }),
 };
 
 module.exports = {

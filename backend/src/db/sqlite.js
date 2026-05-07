@@ -33,7 +33,7 @@ db.exec(`
     amount_cents      INTEGER NOT NULL,
     tx_hash           TEXT,
     status            TEXT    NOT NULL DEFAULT 'pending'
-                              CHECK (status IN ('pending','pending_wallet','locked','released','refunded','relay_failed')),
+                              CHECK (status IN ('pending','pending_wallet','pending_retry','locked','released','refunded','relay_failed')),
     created_at        DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -88,6 +88,24 @@ db.exec(`
     claimed INTEGER NOT NULL DEFAULT 0
   );
   INSERT OR IGNORE INTO scarcity (id, claimed) VALUES (1, 0);
+
+  -- Webhook retry queue for failed on-chain relays
+  CREATE TABLE IF NOT EXISTS webhook_retries (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type    TEXT    NOT NULL,
+    payload       TEXT    NOT NULL,
+    attempts      INTEGER NOT NULL DEFAULT 0,
+    last_error    TEXT,
+    next_retry_at DATETIME NOT NULL,
+    status        TEXT    NOT NULL DEFAULT 'pending'
+                          CHECK (status IN ('pending', 'completed', 'failed')),
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Index for efficient retry queue processing
+  CREATE INDEX IF NOT EXISTS idx_webhook_retries_pending
+    ON webhook_retries (status, next_retry_at)
+    WHERE status = 'pending';
 `);
 
 console.log(`[db] SQLite ready at ${DB_PATH}`);

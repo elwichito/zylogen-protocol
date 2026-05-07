@@ -20,6 +20,7 @@ const { ethers } = require("ethers");
 const db = require("../db/sqlite");
 const { payment: log, webhook: webhookLog } = require("../lib/logger");
 const { sendPaymentConfirmedEmail } = require("./email");
+const retryQueue = require("./retryQueue");
 
 const FOUNDING_100_PRICE_CENTS = 999; // $9.99
 
@@ -290,15 +291,136 @@ async function handleStripeWebhook(req, res) {
     }
   } catch (err) {
     webhookLog.error({ err, sessionId: session.id, email }, "On-chain relay failed");
-    // Record the failure for manual retry — do NOT let Stripe retry (return 200)
+
+    // Record the failure with pending_retry status
     db.prepare(`
       INSERT OR IGNORE INTO escrow_records
         (stripe_session_id, client_email, client_wallet, amount_cents, status)
-      VALUES (?, ?, ?, ?, 'relay_failed')
+      VALUES (?, ?, ?, ?, 'pending_retry')
     `).run(session.id, email, clientWallet, amountCents);
+
+    // Queue for retry with full event payload
+    retryQueue.queueForRetry(event.type, {
+      sessionId: session.id,
+      clientWallet,
+      email,
+      amountCents,
+    }, err.message || "Unknown error");
   }
 
   res.json({ received: true });
 }
 
-module.exports = { handleStripeWebhook, rawBodyMiddleware, relayPaymentToEscrow, releasePayment };
+// ─── Retry processing ─────────────────────────────────────────────────────────
+
+/**
+ * Process a single retry attempt from the queue.
+ * Called by the internal retry processor endpoint.
+ *
+ * @param {object} retry - Retry record from webhook_retries table
+ * @returns {{ success: boolean, error?: string }}
+ */
+async function processRetry(retry) {
+  const payload = JSON.parse(retry.payload);
+  const { sessionId, clientWallet, email } = payload;
+
+  webhookLog.info(
+    { retryId: retry.id, sessionId, attempt: retry.attempts },
+    "Processing webhook retry"
+  );
+
+  try {
+    await relayPaymentToEscrow(clientWallet, email, sessionId);
+
+    // Mark retry as completed
+    retryQueue.markCompleted(retry.id);
+
+    // Send payment confirmation email (fire-and-forget)
+    if (email) {
+      sendPaymentConfirmedEmail(email, "stripe").catch((err) =>
+        webhookLog.error({ err, email }, "Payment confirmation email failed")
+      );
+    }
+
+    return { success: true };
+  } catch (err) {
+    const errorMessage = err.message || "Unknown error";
+    webhookLog.error(
+      { err, retryId: retry.id, sessionId, attempt: retry.attempts },
+      "Retry attempt failed"
+    );
+
+    // Schedule next retry or mark as permanently failed
+    const scheduled = retryQueue.scheduleNextRetry(retry.id, retry.attempts, errorMessage);
+
+    if (!scheduled) {
+      // Max retries exhausted — update escrow record to relay_failed
+      db.prepare(`
+        UPDATE escrow_records
+        SET status = 'relay_failed'
+        WHERE stripe_session_id = ? AND status = 'pending_retry'
+      `).run(sessionId);
+
+      webhookLog.error(
+        { retryId: retry.id, sessionId, email },
+        "All retries exhausted - marked as relay_failed"
+      );
+    }
+
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Process all pending retries that are due.
+ * Called by POST /api/internal/process-retries
+ *
+ * @param {number} limit - Max retries to process in one batch
+ * @returns {{ processed: number, succeeded: number, failed: number, results: Array }}
+ */
+async function processPendingRetries(limit = 10) {
+  const pendingRetries = retryQueue.getPendingRetries(limit);
+
+  if (pendingRetries.length === 0) {
+    webhookLog.debug("No pending retries to process");
+    return { processed: 0, succeeded: 0, failed: 0, results: [] };
+  }
+
+  webhookLog.info({ count: pendingRetries.length }, "Processing pending retries");
+
+  const results = [];
+  let succeeded = 0;
+  let failed = 0;
+
+  for (const retry of pendingRetries) {
+    const result = await processRetry(retry);
+    results.push({ retryId: retry.id, ...result });
+
+    if (result.success) {
+      succeeded++;
+    } else {
+      failed++;
+    }
+  }
+
+  // Cleanup old completed/failed retries periodically (1% chance per batch)
+  if (Math.random() < 0.01) {
+    retryQueue.cleanupOldRetries();
+  }
+
+  return {
+    processed: pendingRetries.length,
+    succeeded,
+    failed,
+    results,
+  };
+}
+
+module.exports = {
+  handleStripeWebhook,
+  rawBodyMiddleware,
+  relayPaymentToEscrow,
+  releasePayment,
+  processRetry,
+  processPendingRetries,
+};

@@ -7,8 +7,10 @@ const cors      = require("cors");
 const helmet    = require("helmet");
 const rateLimit = require("express-rate-limit");
 const { server: log, createRequestLogger } = require("./lib/logger");
-const webhookRouter = require("./routes/webhook");
-const novaRouter    = require("./routes/nova");
+const webhookRouter   = require("./routes/webhook");
+const novaRouter      = require("./routes/nova");
+const internalRouter  = require("./routes/internal");
+const { getFullHealthStatus, getSimpleHealthStatus } = require("./services/healthCheck");
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -90,7 +92,7 @@ app.use(cors({
     cb(new Error(`CORS: origin not allowed — ${origin}`));
   },
   methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-admin-key", "x-internal-key"],
   maxAge: 86400,   // browsers cache preflight for 24h
 }));
 
@@ -107,7 +109,34 @@ app.post("/api/nova/deliver-kit", deliverKitLimiter);
 
 app.use("/api/nova", novaRouter);
 
-app.get("/health", (_req, res) => res.json({ status: "ok", service: "zylogen-nova" }));
+// Internal endpoints (protected by INTERNAL_API_KEY)
+app.use("/api/internal", internalRouter);
+
+// ─── HEALTH ENDPOINTS ─────────────────────────────────────────────────────────
+
+// Simple health check for load balancers (fast, just checks DB)
+app.get("/health", (_req, res) => {
+  const health = getSimpleHealthStatus();
+  const statusCode = health.status === "ok" ? 200 : 503;
+  res.status(statusCode).json({ ...health, service: "zylogen-nova" });
+});
+
+// Detailed health check for admin monitoring (protected by ADMIN_API_KEY)
+app.get("/api/nova/admin/health", async (req, res) => {
+  const adminKey = req.headers["x-admin-key"];
+  if (!adminKey || adminKey !== process.env.ADMIN_API_KEY) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+
+  try {
+    const health = await getFullHealthStatus();
+    const statusCode = health.status === "down" ? 503 : 200;
+    res.status(statusCode).json(health);
+  } catch (err) {
+    log.error({ err }, "Health check failed");
+    res.status(500).json({ status: "error", error: err.message });
+  }
+});
 
 app.use((err, req, res, _next) => {
   log.error({ err, reqId: req.id }, "Unhandled server error");
@@ -124,6 +153,10 @@ app.listen(PORT, () => {
     "POST /api/nova/verify-payment",
     "GET  /api/nova/status?email=",
     "GET  /health",
+    "GET  /api/nova/admin/health",
+    "POST /api/internal/process-retries",
+    "GET  /api/internal/retry-stats",
+    "POST /api/internal/cleanup-retries",
   ]}, "Available routes");
 });
 
