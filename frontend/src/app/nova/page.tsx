@@ -12,6 +12,7 @@ type PayState = "idle" | "loading" | "redirecting" | "cancelled" | "sold_out";
 type CryptoState = "idle" | "approving" | "locking" | "confirming" | "done" | "error";
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
+const REFERRAL_STORAGE_KEY = "zyl_referral_code";
 
 // ─── Contract addresses (from env, with mainnet defaults) ───────────────────
 const TASK_ESCROW = (process.env.NEXT_PUBLIC_TASK_ESCROW_ADDRESS ?? "0xBE464859Fb6f09fa93b6212f616F3AD19ebe48B1") as `0x${string}`;
@@ -38,21 +39,54 @@ export default function NovaPage() {
   const [cryptoState,  setCryptoState]  = useState<CryptoState>("idle");
   const [errorMsg,     setErrorMsg]     = useState<string | null>(null);
   const [lockTxHash,   setLockTxHash]   = useState<`0x${string}` | undefined>();
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [referralValid, setReferralValid] = useState<boolean | null>(null);
 
   // ─── Auto-advance when wallet connects ──────────────────────────────────
   useEffect(() => {
     if (isConnected && address && step === 0) setStep(1);
   }, [isConnected, address, step]);
 
-  // ─── Restore cancelled state from Stripe return ─────────────────────────
+  // ─── Restore cancelled state + handle referral param ────────────────────
   useEffect(() => {
     if (typeof window === "undefined") return;
     const p = new URLSearchParams(window.location.search);
+
+    // Handle payment cancelled
     if (p.get("payment") === "cancelled") {
       setPayState("cancelled");
       window.history.replaceState({}, "", "/nova");
     }
+
+    // Handle referral code from URL
+    const refCode = p.get("ref");
+    if (refCode && refCode.length === 8) {
+      localStorage.setItem(REFERRAL_STORAGE_KEY, refCode.toUpperCase());
+      setReferralCode(refCode.toUpperCase());
+      // Clean URL without losing other params
+      window.history.replaceState({}, "", "/nova");
+      // Validate the code
+      validateReferralCode(refCode.toUpperCase());
+    } else {
+      // Check localStorage for existing referral
+      const storedRef = localStorage.getItem(REFERRAL_STORAGE_KEY);
+      if (storedRef) {
+        setReferralCode(storedRef);
+        validateReferralCode(storedRef);
+      }
+    }
   }, []);
+
+  // ─── Validate referral code ─────────────────────────────────────────────
+  async function validateReferralCode(code: string) {
+    try {
+      const res = await fetch(`${BACKEND}/api/nova/referral/${code}`);
+      const data = await res.json();
+      setReferralValid(data.valid === true);
+    } catch {
+      setReferralValid(false);
+    }
+  }
 
   // ─── Contract writes ───────────────────────────────────────────────────
   const { writeContractAsync: approveUsdc } = useWriteContract();
@@ -65,6 +99,18 @@ export default function NovaPage() {
   useEffect(() => {
     if (lockConfirmed && lockTxHash && email) {
       setCryptoState("done");
+
+      // Apply referral if present (fire-and-forget)
+      const storedRef = localStorage.getItem(REFERRAL_STORAGE_KEY);
+      if (storedRef) {
+        fetch(`${BACKEND}/api/nova/apply-referral`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, referralCode: storedRef }),
+        }).catch(() => {}); // best-effort
+        localStorage.removeItem(REFERRAL_STORAGE_KEY); // Clear after use
+      }
+
       // Notify backend, then redirect
       fetch(`${BACKEND}/api/nova/verify-payment`, {
         method: "POST",
@@ -215,6 +261,13 @@ export default function NovaPage() {
           30-day content strategy — delivered by an AI consultant trained on
           what actually converts.
         </p>
+        {/* Referral badge */}
+        {referralValid && (
+          <div style={s.referralBadge}>
+            <span style={s.referralDot} />
+            Referred by a founding member
+          </div>
+        )}
       </section>
 
       {/* ── Scarcity ── */}
@@ -379,6 +432,8 @@ const s: Record<string, React.CSSProperties> = {
   wordmark:     { fontSize: "11px", letterSpacing: "0.22em", color: "#00ff88", fontFamily: "'Share Tech Mono',monospace", fontWeight: 600 },
   walletPill:   { fontSize: "11px", color: "#00e5ff", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.08em", border: "1px solid rgba(0,229,255,0.3)", padding: "4px 10px", borderRadius: "999px" },
   hero:         { marginBottom: "48px" },
+  referralBadge:{ display: "inline-flex", alignItems: "center", gap: "8px", marginTop: "20px", padding: "8px 14px", background: "rgba(0,255,136,0.05)", border: "1px solid rgba(0,255,136,0.25)", borderRadius: "2px", fontSize: "11px", letterSpacing: "0.1em", color: "#00ff88", fontFamily: "'Share Tech Mono',monospace" },
+  referralDot:  { width: "6px", height: "6px", borderRadius: "50%", background: "#00ff88", flexShrink: 0 },
   eyebrow:      { fontSize: "11px", letterSpacing: "0.18em", textTransform: "uppercase" as const, color: "#00e5ff", fontFamily: "'Share Tech Mono',monospace", marginBottom: "20px" },
   headline:     { fontSize: "clamp(36px,8vw,52px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em", color: "#ffffff", marginBottom: "20px", fontFamily: "'Rajdhani',system-ui,sans-serif" },
   accent:       { fontStyle: "italic", color: "#00e5ff" },

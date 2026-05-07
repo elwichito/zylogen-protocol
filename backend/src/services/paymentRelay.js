@@ -21,6 +21,7 @@ const db = require("../db/sqlite");
 const { payment: log, webhook: webhookLog } = require("../lib/logger");
 const { sendPaymentConfirmedEmail } = require("./email");
 const retryQueue = require("./retryQueue");
+const { invalidateTodayCache: invalidateZylScoreCache } = require("./zylScore");
 
 const FOUNDING_100_PRICE_CENTS = 999; // $9.99
 
@@ -124,6 +125,9 @@ async function relayPaymentToEscrow(clientAddress, customerEmail, stripeSessionI
       VALUES (?, ?)
     `).run(customerEmail, stripeSessionId);
 
+    // Invalidate ZYL Score cache (new order affects score)
+    invalidateZylScoreCache();
+
     log.info({ taskId: mockTaskId, email: customerEmail, dryRun: true }, "DRY RUN: Mock escrow record created");
     return { taskId: mockTaskId, txHash: mockTxHash, dryRun: true };
   }
@@ -173,6 +177,9 @@ async function relayPaymentToEscrow(clientAddress, customerEmail, stripeSessionI
     INSERT OR IGNORE INTO nova_sessions (client_email, stripe_session_id)
     VALUES (?, ?)
   `).run(customerEmail, stripeSessionId);
+
+  // Invalidate ZYL Score cache (new order affects score)
+  invalidateZylScoreCache();
 
   log.info({ taskId, email: customerEmail, txHash: receipt.hash }, "Task locked on-chain");
   return { taskId, txHash: receipt.hash };

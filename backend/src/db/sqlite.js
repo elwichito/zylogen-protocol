@@ -106,7 +106,40 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_webhook_retries_pending
     ON webhook_retries (status, next_retry_at)
     WHERE status = 'pending';
+
+  -- Referral tracking table
+  CREATE TABLE IF NOT EXISTS referrals (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    referrer_email  TEXT    NOT NULL,
+    referee_email   TEXT    NOT NULL UNIQUE,
+    status          TEXT    NOT NULL DEFAULT 'pending'
+                            CHECK (status IN ('pending', 'converted', 'expired')),
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    converted_at    DATETIME
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_referrals_referrer
+    ON referrals (referrer_email);
 `);
+
+// Column migrations for nova_sessions table - add referral columns
+// Note: SQLite doesn't support UNIQUE constraint in ALTER TABLE, so we add a unique index separately
+const sessionCols = db.prepare(`PRAGMA table_info(nova_sessions)`).all().map((c) => c.name);
+const sessionMigrations = [
+  { col: "referral_code",  sql: `ALTER TABLE nova_sessions ADD COLUMN referral_code TEXT` },
+  { col: "referred_by",    sql: `ALTER TABLE nova_sessions ADD COLUMN referred_by TEXT` },
+  { col: "referral_count", sql: `ALTER TABLE nova_sessions ADD COLUMN referral_count INTEGER DEFAULT 0` },
+];
+
+for (const m of sessionMigrations) {
+  if (!sessionCols.includes(m.col)) {
+    db.exec(m.sql);
+    console.log(`[db] Migrated: added column nova_sessions.${m.col}`);
+  }
+}
+
+// Create unique index for referral_code (can't add UNIQUE constraint via ALTER TABLE in SQLite)
+db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_nova_sessions_referral_code ON nova_sessions(referral_code) WHERE referral_code IS NOT NULL`);
 
 console.log(`[db] SQLite ready at ${DB_PATH}`);
 

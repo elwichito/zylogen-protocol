@@ -13,11 +13,18 @@ const { processClientMessage } = require("../agents/novaBrain");
 const { releasePayment }       = require("../services/paymentRelay");
 const { sendPaymentConfirmedEmail, sendKitDeliveredEmail } = require("../services/email");
 const { generateAndSaveKit, markKitDelivered } = require("../services/kitGenerator");
+const { getZylScoreResponse, invalidateTodayCache } = require("../services/zylScore");
 
 const router = express.Router();
 
 const FOUNDING_100_CAP    = 100;
 const FOUNDING_100_CENTS  = 999;
+const crypto = require("crypto");
+
+// Generate a unique referral code (8 chars, alphanumeric uppercase)
+function generateReferralCode() {
+  return crypto.randomBytes(4).toString("hex").toUpperCase();
+}
 
 let _stripe;
 function getStripe() {
@@ -32,6 +39,18 @@ router.get("/scarcity", (_req, res) => {
   const claimed   = row?.claimed ?? 0;
   const remaining = Math.max(0, FOUNDING_100_CAP - claimed);
   res.json({ remaining, claimed, cap: FOUNDING_100_CAP });
+});
+
+// ─── GET /api/zyl-score — public ZYL Score endpoint ─────────────────────────
+
+router.get("/zyl-score", (_req, res) => {
+  try {
+    const scoreData = getZylScoreResponse();
+    res.json(scoreData);
+  } catch (err) {
+    log.error({ err }, "ZYL Score fetch failed");
+    res.status(500).json({ error: "Could not fetch ZYL Score" });
+  }
 });
 
 // ─── POST /api/nova/checkout — create Stripe session ─────────────────────────
@@ -204,12 +223,45 @@ router.post("/verify-payment", async (req, res) => {
     // Increment scarcity counter
     db.prepare(`UPDATE scarcity SET claimed = claimed + 1 WHERE id = 1`).run();
 
-    // Create Nova session
-    db.prepare(`
-      INSERT OR IGNORE INTO nova_sessions (client_email) VALUES (?)
-    `).run(email);
+    // Generate unique referral code for new user
+    let referralCode = generateReferralCode();
+    let attempts = 0;
+    while (attempts < 10) {
+      const exists = db.prepare(`SELECT id FROM nova_sessions WHERE referral_code = ?`).get(referralCode);
+      if (!exists) break;
+      referralCode = generateReferralCode();
+      attempts++;
+    }
 
-    log.info({ email, wallet: walletAddress, txHash }, "Wallet payment verified");
+    // Check for pending referral (someone referred this user)
+    const pendingReferral = db.prepare(
+      `SELECT referrer_email FROM referrals WHERE referee_email = ? AND status = 'pending'`
+    ).get(email);
+
+    // Create Nova session with referral code
+    db.prepare(`
+      INSERT OR IGNORE INTO nova_sessions (client_email, referral_code, referred_by) VALUES (?, ?, ?)
+    `).run(email, referralCode, pendingReferral?.referrer_email || null);
+
+    // If there was a pending referral, convert it and increment referrer's count
+    if (pendingReferral) {
+      db.prepare(`
+        UPDATE referrals SET status = 'converted', converted_at = CURRENT_TIMESTAMP
+        WHERE referee_email = ? AND status = 'pending'
+      `).run(email);
+
+      db.prepare(`
+        UPDATE nova_sessions SET referral_count = referral_count + 1
+        WHERE client_email = ?
+      `).run(pendingReferral.referrer_email);
+
+      log.info({ referrer: pendingReferral.referrer_email, referee: email }, "Referral converted");
+    }
+
+    log.info({ email, wallet: walletAddress, txHash, referralCode }, "Wallet payment verified");
+
+    // Invalidate ZYL Score cache (new order affects score)
+    invalidateTodayCache();
 
     // Send payment confirmation email (fire-and-forget)
     sendPaymentConfirmedEmail(email, "crypto").catch((err) =>
@@ -292,7 +344,7 @@ router.get("/status", (req, res) => {
   if (!email) return res.status(400).json({ error: "email required" });
 
   const session = db.prepare(
-    `SELECT stage, language, business_type, vibe_tags, brand_description, delivery_status, branding_kit FROM nova_sessions WHERE client_email = ?`
+    `SELECT stage, language, business_type, vibe_tags, brand_description, delivery_status, branding_kit, referral_code, referral_count, referred_by FROM nova_sessions WHERE client_email = ?`
   ).get(email);
 
   if (!session) return res.json({ stage: "not_started" });
@@ -305,6 +357,9 @@ router.get("/status", (req, res) => {
     brandDescription: session.brand_description,
     deliveryStatus: session.delivery_status,
     kit: session.branding_kit ? JSON.parse(session.branding_kit) : null,
+    referralCode: session.referral_code,
+    referralCount: session.referral_count || 0,
+    wasReferred: !!session.referred_by,
   });
 });
 
@@ -409,6 +464,139 @@ router.get("/admin/orders", (req, res) => {
     log.error({ err }, "Admin orders fetch failed");
     res.status(500).json({ error: "Failed to fetch orders" });
   }
+});
+
+// ─── GET /api/nova/referral/:code — validate referral code ───────────────────
+
+router.get("/referral/:code", (req, res) => {
+  const { code } = req.params;
+
+  if (!code || code.length !== 8) {
+    return res.status(400).json({ error: "invalid referral code" });
+  }
+
+  const session = db.prepare(
+    `SELECT client_email, referral_count FROM nova_sessions WHERE referral_code = ?`
+  ).get(code.toUpperCase());
+
+  if (!session) {
+    return res.status(404).json({ error: "referral code not found", valid: false });
+  }
+
+  // Don't expose full email, just confirm valid
+  const maskedEmail = session.client_email.replace(/(.{2})(.*)(@.*)/, "$1***$3");
+
+  res.json({
+    valid: true,
+    referrerHint: maskedEmail,
+    referralCount: session.referral_count || 0,
+  });
+});
+
+// ─── POST /api/nova/apply-referral — link referee to referrer ────────────────
+
+router.post("/apply-referral", (req, res) => {
+  const { email, referralCode } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: "email required" });
+  }
+  if (!referralCode || referralCode.length !== 8) {
+    return res.status(400).json({ error: "invalid referral code" });
+  }
+
+  const code = referralCode.toUpperCase();
+
+  // Find referrer by code
+  const referrer = db.prepare(
+    `SELECT client_email FROM nova_sessions WHERE referral_code = ?`
+  ).get(code);
+
+  if (!referrer) {
+    return res.status(404).json({ error: "referral code not found" });
+  }
+
+  // Don't allow self-referral
+  if (referrer.client_email.toLowerCase() === email.toLowerCase()) {
+    return res.status(400).json({ error: "cannot refer yourself" });
+  }
+
+  // Check if referee already exists and has a referrer
+  const existingSession = db.prepare(
+    `SELECT referred_by FROM nova_sessions WHERE client_email = ?`
+  ).get(email);
+
+  if (existingSession?.referred_by) {
+    return res.json({ ok: true, message: "already referred", alreadyReferred: true });
+  }
+
+  // Check if referral already recorded
+  const existingReferral = db.prepare(
+    `SELECT id FROM referrals WHERE referee_email = ?`
+  ).get(email);
+
+  if (existingReferral) {
+    return res.json({ ok: true, message: "referral already recorded" });
+  }
+
+  try {
+    // Record the referral (pending until referee completes purchase)
+    db.prepare(`
+      INSERT INTO referrals (referrer_email, referee_email, status)
+      VALUES (?, ?, 'pending')
+    `).run(referrer.client_email, email);
+
+    log.info({ referrer: referrer.client_email, referee: email, code }, "Referral applied");
+
+    res.json({ ok: true, referrerEmail: referrer.client_email });
+  } catch (err) {
+    // Handle unique constraint violation gracefully
+    if (err.code === "SQLITE_CONSTRAINT") {
+      return res.json({ ok: true, message: "referral already recorded" });
+    }
+    log.error({ err, email, code }, "Apply referral failed");
+    res.status(500).json({ error: "Could not apply referral" });
+  }
+});
+
+// ─── GET /api/nova/my-referrals — get user's referral stats ──────────────────
+
+router.get("/my-referrals", (req, res) => {
+  const { email } = req.query;
+
+  if (!email) {
+    return res.status(400).json({ error: "email required" });
+  }
+
+  const session = db.prepare(
+    `SELECT referral_code, referral_count FROM nova_sessions WHERE client_email = ?`
+  ).get(email);
+
+  if (!session) {
+    return res.status(404).json({ error: "session not found" });
+  }
+
+  // Get detailed referral list
+  const referrals = db.prepare(`
+    SELECT referee_email, status, created_at, converted_at
+    FROM referrals
+    WHERE referrer_email = ?
+    ORDER BY created_at DESC
+  `).all(email);
+
+  // Mask emails for privacy
+  const maskedReferrals = referrals.map((r) => ({
+    email: r.referee_email.replace(/(.{2})(.*)(@.*)/, "$1***$3"),
+    status: r.status,
+    createdAt: r.created_at,
+    convertedAt: r.converted_at,
+  }));
+
+  res.json({
+    referralCode: session.referral_code,
+    referralCount: session.referral_count || 0,
+    referrals: maskedReferrals,
+  });
 });
 
 module.exports = router;

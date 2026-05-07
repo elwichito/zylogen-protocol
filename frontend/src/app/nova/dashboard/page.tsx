@@ -12,6 +12,9 @@ interface StatusData {
   language?: Lang;
   deliveryStatus?: string | null;
   kit?: object | null;
+  referralCode?: string | null;
+  referralCount?: number;
+  wasReferred?: boolean;
 }
 
 interface ScarcityData {
@@ -65,8 +68,19 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedVibes, setSelectedVibes] = useState<string[]>([]);
   const [showOtherInput, setShowOtherInput] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   const lang: Lang = status?.language === "es" ? "es" : "en";
+
+  // Copy referral link to clipboard
+  const copyReferralLink = () => {
+    if (!status?.referralCode) return;
+    const link = `https://zylogen.xyz/nova?ref=${status.referralCode}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    });
+  };
 
   // ─── Read params from URL ───────────────────────────────────────────────
 
@@ -205,6 +219,44 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {/* ── Referral Share Card ── */}
+      {status?.referralCode && (
+        <div style={s.referralCard}>
+          <div style={s.referralHeader}>
+            <span style={s.referralTitle}>Share & Earn</span>
+            {(status.referralCount ?? 0) > 0 && (
+              <span style={s.referralBadge}>{status.referralCount} referred</span>
+            )}
+          </div>
+          <p style={s.referralDesc}>
+            {lang === "es"
+              ? "Invita a otros fundadores. Pronto recompensaremos a los referidos."
+              : "Invite other founders. Referral rewards coming soon."}
+          </p>
+          <div style={s.referralLinkRow}>
+            <input
+              type="text"
+              readOnly
+              value={`zylogen.xyz/nova?ref=${status.referralCode}`}
+              style={s.referralInput}
+            />
+            <button onClick={copyReferralLink} style={s.copyBtn}>
+              {copySuccess ? (lang === "es" ? "Copiado" : "Copied") : (lang === "es" ? "Copiar" : "Copy")}
+            </button>
+          </div>
+          <div style={s.shareButtons}>
+            <a
+              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent("I just joined the Founding 100 at Zylogen. Get your AI branding kit:")}&url=${encodeURIComponent(`https://zylogen.xyz/nova?ref=${status.referralCode}`)}`}
+              target="_blank"
+              rel="noreferrer"
+              style={s.shareBtn}
+            >
+              Share on X
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* ── Stage indicator ── */}
       <div style={s.stageRow}>
         <span style={s.stageLabel}>
@@ -326,10 +378,21 @@ const s: Record<string, React.CSSProperties> = {
   wordmark:        { fontSize: "11px", letterSpacing: "0.22em", color: "#00ff88", fontFamily: "'Share Tech Mono',monospace", fontWeight: 600 },
   ghostLink:       { fontSize: "11px", color: "#606060", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.08em" },
   scarcityBadge:   { fontSize: "10px", letterSpacing: "0.12em", color: "#00e5ff", fontFamily: "'Share Tech Mono',monospace", padding: "4px 10px", border: "1px solid #1a2a2a", borderRadius: "2px", background: "#0a1214" },
-  confirmBanner:   { display: "flex", alignItems: "center", gap: "10px", marginBottom: "32px", padding: "12px 16px", border: "1px solid #1a2a1a", borderRadius: "2px", background: "#0a140a" },
+  confirmBanner:   { display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", padding: "12px 16px", border: "1px solid #1a2a1a", borderRadius: "2px", background: "#0a140a" },
   confirmDot:      { width: "6px", height: "6px", borderRadius: "50%", background: "#00ff88", flexShrink: 0 },
   confirmText:     { fontSize: "12px", color: "#00ff88", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.06em", flex: 1 },
   txLink:          { fontSize: "11px", color: "#00e5ff", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.06em", flexShrink: 0 },
+  // Referral card styles
+  referralCard:    { marginBottom: "32px", padding: "20px", border: "1px solid #1a2a2a", borderRadius: "2px", background: "linear-gradient(135deg, #0a1214 0%, #0d1117 100%)" },
+  referralHeader:  { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" },
+  referralTitle:   { fontSize: "13px", fontWeight: 600, letterSpacing: "0.1em", color: "#00e5ff", fontFamily: "'Share Tech Mono',monospace", textTransform: "uppercase" as const },
+  referralBadge:   { fontSize: "10px", letterSpacing: "0.1em", color: "#00ff88", fontFamily: "'Share Tech Mono',monospace", padding: "3px 8px", border: "1px solid rgba(0,255,136,0.3)", borderRadius: "2px", background: "rgba(0,255,136,0.05)" },
+  referralDesc:    { fontSize: "12px", color: "#606060", fontFamily: "'Rajdhani',system-ui,sans-serif", marginBottom: "14px", lineHeight: 1.5 },
+  referralLinkRow: { display: "flex", gap: "8px", marginBottom: "12px" },
+  referralInput:   { flex: 1, padding: "10px 12px", background: "#0a0a0a", border: "1px solid #1a2a1a", borderRadius: "2px", color: "#808080", fontSize: "12px", fontFamily: "'Share Tech Mono',monospace", outline: "none" },
+  copyBtn:         { padding: "10px 16px", background: "#00e5ff", color: "#0a0a0a", border: "none", borderRadius: "2px", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, cursor: "pointer", fontFamily: "'Share Tech Mono',monospace", minWidth: "80px" },
+  shareButtons:    { display: "flex", gap: "8px" },
+  shareBtn:        { padding: "8px 14px", background: "transparent", color: "#606060", border: "1px solid #1a2a1a", borderRadius: "2px", fontSize: "11px", fontWeight: 600, letterSpacing: "0.06em", cursor: "pointer", fontFamily: "'Share Tech Mono',monospace", transition: "all 0.2s ease" },
   stageRow:        { marginBottom: "32px" },
   stageLabel:      { fontSize: "13px", color: "#606060", fontFamily: "'Share Tech Mono',monospace" },
   chatWrap:        { display: "flex", flexDirection: "column", gap: "12px", marginBottom: "48px" },
