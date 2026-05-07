@@ -14,7 +14,15 @@
       "Bash(vercel env:*)",
       "Bash(git add:*)",
       "Bash(git commit -m ':*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(curl:*)",
+      "Bash(git -C /Users/wich/zylogen-protocol ls-files)",
+      "Bash(git pull:*)",
+      "Bash(node_modules/.bin/hardhat compile:*)",
+      "Bash(node_modules/.bin/hardhat test:*)",
+      "Bash(git commit:*)",
+      "Bash(npx vercel:*)",
+      "Bash(railway --version)"
     ]
   }
 }
