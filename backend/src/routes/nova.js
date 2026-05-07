@@ -12,6 +12,7 @@ const { nova: log } = require("../lib/logger");
 const { processClientMessage } = require("../agents/novaBrain");
 const { releasePayment }       = require("../services/paymentRelay");
 const { sendPaymentConfirmedEmail, sendKitDeliveredEmail } = require("../services/email");
+const { generateAndSaveKit, markKitDelivered } = require("../services/kitGenerator");
 
 const router = express.Router();
 
@@ -101,6 +102,40 @@ router.post("/message", async (req, res) => {
 
   try {
     const result = await processClientMessage(email, message.trim());
+
+    // Auto-generate branding kit when briefing is complete
+    if (result.stage === "brief_complete") {
+      log.info({ email }, "Brief complete - starting auto kit generation");
+
+      // Fire-and-forget kit generation (runs in background)
+      generateAndSaveKit(email)
+        .then((kit) => {
+          log.info({ email }, "Auto-generated kit ready");
+
+          // Mark as delivered and update stage
+          markKitDelivered(email, kit);
+
+          // Trigger on-chain settlement
+          const record = db.prepare(
+            `SELECT escrow_id FROM escrow_records WHERE client_email = ? AND status = 'locked' LIMIT 1`
+          ).get(email);
+
+          if (record?.escrow_id) {
+            releasePayment(record.escrow_id, email).catch((err) =>
+              log.error({ err, email, escrowId: record.escrow_id }, "Release payment failed")
+            );
+          }
+
+          // Send kit delivered email
+          sendKitDeliveredEmail(email, kit).catch((err) =>
+            log.error({ err, email }, "Kit delivered email failed")
+          );
+        })
+        .catch((err) => {
+          log.error({ err, email }, "Auto kit generation failed");
+          // Kit generation failed - leave delivery_status as 'pending' for manual intervention
+        });
+    }
 
     // Trigger on-chain settlement and send email when kit is delivered for the first time
     if (result.stage === "kit_delivered") {
@@ -271,6 +306,109 @@ router.get("/status", (req, res) => {
     deliveryStatus: session.delivery_status,
     kit: session.branding_kit ? JSON.parse(session.branding_kit) : null,
   });
+});
+
+// ─── POST /api/nova/admin/generate-kit — manually trigger kit generation ──────
+
+router.post("/admin/generate-kit", async (req, res) => {
+  // Admin API key auth
+  const adminKey = req.headers["x-admin-key"];
+  if (!adminKey || adminKey !== process.env.ADMIN_API_KEY) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+
+  const { email, deliver } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: "email required" });
+  }
+
+  // Check session exists and has briefing data
+  const session = db.prepare(
+    `SELECT stage, business_type, brand_description FROM nova_sessions WHERE client_email = ?`
+  ).get(email);
+
+  if (!session) {
+    return res.status(404).json({ error: "session not found" });
+  }
+
+  if (!session.business_type || !session.brand_description) {
+    return res.status(400).json({ error: "briefing incomplete - need business_type and brand_description" });
+  }
+
+  try {
+    log.info({ email, deliver }, "Admin triggered kit generation");
+
+    const kit = await generateAndSaveKit(email);
+
+    // Optionally mark as delivered immediately
+    if (deliver) {
+      markKitDelivered(email, kit);
+
+      // Trigger on-chain settlement
+      const record = db.prepare(
+        `SELECT escrow_id FROM escrow_records WHERE client_email = ? AND status = 'locked' LIMIT 1`
+      ).get(email);
+
+      if (record?.escrow_id) {
+        releasePayment(record.escrow_id, email).catch((err) =>
+          log.error({ err, email, escrowId: record.escrow_id }, "Release payment failed")
+        );
+      }
+
+      // Send kit delivered email
+      sendKitDeliveredEmail(email, kit).catch((err) =>
+        log.error({ err, email }, "Kit delivered email failed")
+      );
+    }
+
+    res.json({ success: true, delivered: !!deliver, kit });
+  } catch (err) {
+    log.error({ err, email }, "Admin kit generation failed");
+    res.status(500).json({ error: err.message || "Kit generation failed" });
+  }
+});
+
+// ─── GET /api/nova/admin/orders — list all orders for admin ───────────────────
+
+router.get("/admin/orders", (req, res) => {
+  // Admin API key auth
+  const adminKey = req.headers["x-admin-key"];
+  if (!adminKey || adminKey !== process.env.ADMIN_API_KEY) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+
+  try {
+    // Get all nova_sessions with their escrow_records
+    const orders = db.prepare(`
+      SELECT
+        ns.id,
+        ns.client_email AS email,
+        er.client_wallet AS wallet,
+        ns.stage,
+        ns.delivery_status,
+        ns.branding_kit,
+        ns.created_at,
+        er.status AS escrow_status,
+        er.tx_hash,
+        er.amount_cents
+      FROM nova_sessions ns
+      LEFT JOIN escrow_records er ON er.client_email = ns.client_email
+      ORDER BY ns.created_at DESC
+    `).all();
+
+    // Parse branding_kit JSON for each order
+    const parsed = orders.map((o) => ({
+      ...o,
+      branding_kit: o.branding_kit ? JSON.parse(o.branding_kit) : null,
+    }));
+
+    log.info({ count: parsed.length }, "Admin orders fetched");
+    res.json({ orders: parsed });
+  } catch (err) {
+    log.error({ err }, "Admin orders fetch failed");
+    res.status(500).json({ error: "Failed to fetch orders" });
+  }
 });
 
 module.exports = router;
