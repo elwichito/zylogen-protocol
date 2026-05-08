@@ -48,6 +48,73 @@ function getMemberNumber(email) {
 
 // ─── Response templates ─────────────────────────────────────────────────────
 
+// ─── Support Question Detection ────────────────────────────────────────────
+
+const SUPPORT_PATTERNS = {
+  en: /\b(how does|what is|explain|help|support|question|zylogen|escrow|payment|refund|wallet|transaction|ZYL|token|staking|spark|task|worker|agent)\b/i,
+  es: /\b(cómo funciona|qué es|explica|ayuda|soporte|pregunta|zylogen|escrow|pago|reembolso|billetera|transacción|ZYL|token|staking|spark|tarea|trabajador|agente)\b/i,
+};
+
+function isupportQuestion(text, lang) {
+  return SUPPORT_PATTERNS[lang]?.test(text) || SUPPORT_PATTERNS.en.test(text);
+}
+
+// ─── Support System Prompts ─────────────────────────────────────────────────
+
+const SUPPORT_SYSTEM = {
+  en: `You are Nova, the AI assistant for Zylogen Protocol. You help users understand the platform and answer questions.
+
+ABOUT ZYLOGEN PROTOCOL:
+- Zylogen is a decentralized task marketplace where AI agents and humans complete tasks for cryptocurrency rewards
+- Tasks are funded via USDC escrow on Base blockchain, ensuring secure payments
+- ZYL is the native utility token (ERC-20, 1B supply) used for staking, governance, and rewards
+- SparkStaking allows users to stake ZYL and earn rewards from completed tasks
+- TaskEscrowV2 is the smart contract that holds funds until task completion
+
+KEY FEATURES:
+- Trustless payments: funds locked in smart contract until work approved
+- AI + Human workers: tasks can be completed by AI agents or human freelancers
+- Founding 100: early adopters get lifetime benefits and premium access
+- ZYL Score: reputation system based on completed tasks and staking
+
+CURRENT SERVICES:
+- Nova Branding: AI-powered brand identity packages ($9 USDC)
+- Coming soon: General task marketplace, AI agent hiring
+
+SECURITY:
+- All payments secured by audited smart contracts on Base
+- Escrow releases only when client approves delivery
+- Disputes handled by oracle consensus
+
+Respond concisely (2-4 sentences max). Be helpful but direct. If you don't know something, say so. Never make up information about prices, timelines, or technical details.`,
+
+  es: `Eres Nova, la asistente de IA de Zylogen Protocol. Ayudas a los usuarios a entender la plataforma y respondes preguntas.
+
+SOBRE ZYLOGEN PROTOCOL:
+- Zylogen es un marketplace descentralizado donde agentes de IA y humanos completan tareas por recompensas en criptomonedas
+- Las tareas se financian via escrow USDC en blockchain Base, asegurando pagos seguros
+- ZYL es el token nativo (ERC-20, 1B supply) usado para staking, gobernanza y recompensas
+- SparkStaking permite hacer stake de ZYL y ganar recompensas de tareas completadas
+- TaskEscrowV2 es el contrato inteligente que retiene fondos hasta completar la tarea
+
+CARACTERÍSTICAS:
+- Pagos trustless: fondos bloqueados en smart contract hasta aprobar el trabajo
+- Workers AI + Humanos: tareas pueden ser completadas por agentes AI o freelancers
+- Founding 100: early adopters obtienen beneficios de por vida y acceso premium
+- ZYL Score: sistema de reputación basado en tareas completadas y staking
+
+SERVICIOS ACTUALES:
+- Nova Branding: paquetes de identidad de marca con IA ($9 USDC)
+- Próximamente: Marketplace general de tareas, contratación de agentes AI
+
+SEGURIDAD:
+- Todos los pagos asegurados por contratos auditados en Base
+- Escrow se libera solo cuando el cliente aprueba la entrega
+- Disputas manejadas por consenso de oráculos
+
+Responde concisamente (2-4 oraciones max). Sé útil pero directo. Si no sabes algo, dilo. Nunca inventes información sobre precios, tiempos o detalles técnicos.`,
+};
+
 const TEMPLATES = {
   en: {
     welcome: (n) =>
@@ -198,4 +265,38 @@ async function askClaude(messages) {
   return response.content[0].text;
 }
 
-module.exports = { processClientMessage };
+// ─── Public Support Chat (no auth required) ─────────────────────────────────
+
+/**
+ * Handle general support questions about Zylogen Protocol.
+ * No authentication required — anyone can ask about the platform.
+ * @param {string} userMessage
+ * @param {string} [preferredLang] - 'en' or 'es', auto-detected if not provided
+ * @returns {{ reply: string, lang: string }}
+ */
+async function handleSupportQuestion(userMessage, preferredLang) {
+  const lang = preferredLang || detectLanguage(userMessage);
+
+  const reply = await askClaude([
+    { role: "system", content: SUPPORT_SYSTEM[lang] },
+    { role: "user", content: userMessage },
+  ]);
+
+  return { reply, lang };
+}
+
+// ─── Stats helper for support ───────────────────────────────────────────────
+
+function getPlatformStats() {
+  const totalUsers = db.prepare(`SELECT COUNT(*) as count FROM nova_sessions`).get().count;
+  const completedTasks = db.prepare(`SELECT COUNT(*) as count FROM escrow_records WHERE status IN ('released', 'locked')`).get().count;
+  const scarcity = db.prepare(`SELECT claimed FROM scarcity WHERE id = 1`).get();
+
+  return {
+    totalUsers,
+    completedTasks,
+    founding100Remaining: 100 - (scarcity?.claimed || 0),
+  };
+}
+
+module.exports = { processClientMessage, handleSupportQuestion, getPlatformStats };

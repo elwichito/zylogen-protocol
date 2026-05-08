@@ -9,7 +9,7 @@ const express = require("express");
 const Stripe  = require("stripe");
 const db      = require("../db/sqlite");
 const { nova: log } = require("../lib/logger");
-const { processClientMessage } = require("../agents/novaBrain");
+const { processClientMessage, handleSupportQuestion, getPlatformStats } = require("../agents/novaBrain");
 const { releasePayment }       = require("../services/paymentRelay");
 const { sendPaymentConfirmedEmail, sendKitDeliveredEmail } = require("../services/email");
 const { generateAndSaveKit, markKitDelivered } = require("../services/kitGenerator");
@@ -50,6 +50,41 @@ router.get("/zyl-score", (_req, res) => {
   } catch (err) {
     log.error({ err }, "ZYL Score fetch failed");
     res.status(500).json({ error: "Could not fetch ZYL Score" });
+  }
+});
+
+// ─── POST /api/nova/support — public customer support chat ───────────────────
+// No auth required — anyone can ask questions about Zylogen Protocol
+
+router.post("/support", async (req, res) => {
+  const { message, lang } = req.body;
+
+  if (!message || typeof message !== "string" || message.trim().length === 0) {
+    return res.status(400).json({ error: "message required" });
+  }
+
+  if (message.length > 1000) {
+    return res.status(400).json({ error: "message too long (max 1000 chars)" });
+  }
+
+  try {
+    const result = await handleSupportQuestion(message.trim(), lang);
+    res.json(result);
+  } catch (err) {
+    log.error({ err }, "Support chat failed");
+    res.status(500).json({ error: "Nova encountered an error. Please try again." });
+  }
+});
+
+// ─── GET /api/nova/stats — public platform stats ─────────────────────────────
+
+router.get("/stats", (_req, res) => {
+  try {
+    const stats = getPlatformStats();
+    res.json(stats);
+  } catch (err) {
+    log.error({ err }, "Stats fetch failed");
+    res.status(500).json({ error: "Could not fetch stats" });
   }
 });
 

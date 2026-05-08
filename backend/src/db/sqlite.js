@@ -141,6 +141,22 @@ for (const m of sessionMigrations) {
 // Create unique index for referral_code (can't add UNIQUE constraint via ALTER TABLE in SQLite)
 db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_nova_sessions_referral_code ON nova_sessions(referral_code) WHERE referral_code IS NOT NULL`);
 
+// ─── Performance Indexes ──────────────────────────────────────────────────────
+db.exec(`
+  -- escrow_records: fast lookup by email and status
+  CREATE INDEX IF NOT EXISTS idx_escrow_email ON escrow_records(client_email);
+  CREATE INDEX IF NOT EXISTS idx_escrow_status ON escrow_records(status);
+  CREATE INDEX IF NOT EXISTS idx_escrow_email_status ON escrow_records(client_email, status);
+
+  -- nova_sessions: fast lookup by email and stage
+  CREATE INDEX IF NOT EXISTS idx_sessions_email ON nova_sessions(client_email);
+  CREATE INDEX IF NOT EXISTS idx_sessions_stage ON nova_sessions(stage);
+  CREATE INDEX IF NOT EXISTS idx_sessions_delivery ON nova_sessions(delivery_status) WHERE delivery_status IS NOT NULL;
+
+  -- referrals: fast referrer lookup
+  CREATE INDEX IF NOT EXISTS idx_referrals_status ON referrals(status);
+`);
+
 console.log(`[db] SQLite ready at ${DB_PATH}`);
 
 module.exports = db;
