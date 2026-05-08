@@ -52,16 +52,14 @@ const ERC20_ABI = [
   "function allowance(address owner, address spender) external view returns (uint256)",
 ];
 
-// TaskEscrowV2 ABI — verified at 0xBE464859Fb6f09fa93b6212f616F3AD19ebe48B1
+// TaskEscrowV2 ABI — ZYL Genesis (Base Sepolia: 0x9b1516C79855F8E01A5Eb4B4E3A34430041Ae254)
 const ESCROW_ABI = [
-  "function lock(bytes32 taskId, address worker, uint256 amount, uint256 deadline) external",
-  "function release(bytes32 taskId) external",
+  "function lock(bytes32 taskId, address client, address worker, address agent, address token, uint256 amount, bytes32 sponsorRoot) external payable",
+  "function settle(bytes32 taskId) external",
   "function refund(bytes32 taskId) external",
-  "event TaskLocked(bytes32 indexed taskId, address indexed client, address indexed worker, uint256 amount, uint256 deadline)",
+  "function escrows(bytes32 taskId) external view returns (uint8 status, address client, address worker, address agent, address tokenAddr, uint256 amount, uint256 workerAmountToken, uint256 treasuryAmountToken, uint256 burnAmountZyl, uint256 sparkAmountZyl, uint64 lockedAt)",
+  "event Locked(bytes32 indexed taskId, address indexed client, address indexed worker, address agent, address token, uint256 amount)",
 ];
-
-// 24-hour deadline for each task
-const DEADLINE_SECONDS = 24 * 3600;
 
 // Deterministic taskId from Stripe session + client wallet + timestamp
 function generateTaskId(stripeSessionId, clientAddress, timestamp) {
@@ -146,15 +144,24 @@ async function relayPaymentToEscrow(clientAddress, customerEmail, stripeSessionI
     log.info({ escrow: TASK_ESCROW_ADDRESS }, "USDC spending approved");
   }
 
-  // 2. Generate deterministic taskId and deadline
+  // 2. Generate deterministic taskId
   const timestamp = Math.floor(Date.now() / 1000);
-  const taskId  = generateTaskId(stripeSessionId, clientAddress, timestamp);
-  const deadline = timestamp + DEADLINE_SECONDS;
+  const taskId = generateTaskId(stripeSessionId, clientAddress, timestamp);
 
-  // 3. Call lock() — relayer is msg.sender (client in Task struct), Nova wallet is worker
-  const workerAddress = process.env.NOVA_WORKER_ADDRESS;
-  if (!workerAddress) throw new Error("NOVA_WORKER_ADDRESS env var not set");
-  const tx = await escrow.lock(taskId, workerAddress, USDC_LOCK_AMOUNT, deadline);
+  // 3. Call lock() — TaskEscrowV2 signature
+  const workerAddress = process.env.NOVA_WORKER_ADDRESS || relayer.address;
+  const agentAddress = process.env.NOVA_AGENT_ADDRESS || relayer.address;
+  const sponsorRoot = ethers.ZeroHash; // No sponsor tree for now
+
+  const tx = await escrow.lock(
+    taskId,
+    clientAddress,    // client
+    workerAddress,    // worker (Nova)
+    agentAddress,     // agent (Nova's AgentID)
+    USDC_ADDRESS,     // payment token
+    USDC_LOCK_AMOUNT, // amount
+    sponsorRoot       // sponsorRoot
+  );
   const receipt = await tx.wait();
 
   // 4. Persist to SQLite
@@ -216,14 +223,15 @@ async function releasePayment(escrowId, email) {
   const relayer = getRelayer();
   const escrow  = new ethers.Contract(TASK_ESCROW_ADDRESS, ESCROW_ABI, relayer);
 
-  const tx      = await escrow.release(escrowId);
+  // TaskEscrowV2 uses settle() instead of release()
+  const tx      = await escrow.settle(escrowId);
   const receipt = await tx.wait();
 
   db.prepare(`
     UPDATE escrow_records SET status = 'released' WHERE client_email = ? AND escrow_id = ?
   `).run(email, escrowId);
 
-  log.info({ escrowId, email, txHash: receipt.hash }, "Escrow released on-chain");
+  log.info({ escrowId, email, txHash: receipt.hash }, "Escrow settled on-chain (ZYL burned + worker paid)");
   return { released: true, txHash: receipt.hash };
 }
 
