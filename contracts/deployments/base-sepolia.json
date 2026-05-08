@@ -1,0 +1,20 @@
+{
+  "network": "Base Sepolia",
+  "chainId": 84532,
+  "deployedAt": "2026-05-08",
+  "deployer": "0x8bcB4935FC0aEAf5733d96a8a72a2Ac79bD3693e",
+  "contracts": {
+    "ZylogenDeployer": "0x2Db1CBf792836A121268814569b1f1FE07eE193c",
+    "ZYL": "0x426608a34227b6edc61b2ced47ba235b4f747c4a",
+    "TeamVesting": "0xf10ea18599e3767cfb9f07f40763d22564f8ffed",
+    "TaskEscrowV2": "0x9b1516C79855F8E01A5Eb4B4E3A34430041Ae254",
+    "SparkStaking": "0x7adBd700658264D728C5289dB093DF441Ed3Bb7d"
+  },
+  "externalContracts": {
+    "USDC": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+  },
+  "configuration": {
+    "zylRatePerUSDC": 100,
+    "escrowReserve": "1000000000000000000000000"
+  }
+}

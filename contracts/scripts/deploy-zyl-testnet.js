@@ -50,10 +50,54 @@ async function main() {
 
   // 2. Atomic deploy: ZYL + TeamVesting + 1B distribution
   console.log("\n[2/5] Atomic deploy: ZYL + TeamVesting + distribution...");
-  const tx = await factory.deploy(testParams);
+  console.log("      Params:", JSON.stringify({
+    multisig: testParams.multisig,
+    stakingPool: testParams.stakingPool,
+    lpReserve: testParams.lpReserve,
+    grantsMultisig: testParams.grantsMultisig,
+    teamBeneficiaries: testParams.teamBeneficiaries,
+    teamAmounts: testParams.teamAmounts.map(a => a.toString()),
+    vestStart: testParams.vestStart.toString(),
+  }, null, 2));
+
+  let tx;
+  try {
+    tx = await factory.deploy(testParams, {
+      gasLimit: 8_000_000,
+    });
+  } catch (err) {
+    console.error("      TX send failed:", err.message);
+    if (err.data) console.error("      Revert data:", err.data);
+    throw err;
+  }
+
+  console.log("      TX hash:", tx.hash);
   const receipt = await tx.wait();
-  const zylAddr = await factory.deployedZYL();
-  const vestingAddr = await factory.deployedVesting();
+  console.log("      Status:", receipt.status, "| Gas used:", receipt.gasUsed.toString());
+
+  if (receipt.status === 0) {
+    throw new Error("Deploy transaction reverted on-chain");
+  }
+
+  // Parse Deployed event from receipt to get addresses
+  const deployedEvent = receipt.logs.find(log => {
+    try {
+      const parsed = factory.interface.parseLog({ topics: log.topics, data: log.data });
+      return parsed?.name === "Deployed";
+    } catch { return false; }
+  });
+
+  let zylAddr, vestingAddr;
+  if (deployedEvent) {
+    const parsed = factory.interface.parseLog({ topics: deployedEvent.topics, data: deployedEvent.data });
+    zylAddr = parsed.args[0];      // zyl
+    vestingAddr = parsed.args[1];  // teamVesting
+  } else {
+    // Fallback: try view functions
+    zylAddr = await factory.deployedZYL();
+    vestingAddr = await factory.deployedVesting();
+  }
+
   console.log(`      ZYL:         ${zylAddr}`);
   console.log(`      TeamVesting: ${vestingAddr}`);
   console.log(`      Gas used:    ${receipt.gasUsed.toString()}`);
