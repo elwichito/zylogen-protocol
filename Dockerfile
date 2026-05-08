@@ -16,7 +16,8 @@ RUN mkdir -p /data
 COPY backend/package*.json ./
 RUN npm ci --omit=dev
 
-# Copy backend source code
+# Force rebuild - timestamp: 2026-05-08T03:00
+ARG CACHEBUST=1
 COPY backend/src/ ./src/
 
 EXPOSE 3001
