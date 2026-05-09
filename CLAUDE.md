@@ -14,15 +14,27 @@ This is the source of truth. Do not build anything outside this scope without Lo
 ### What IS the stack
 | Layer | Tech |
 |-------|------|
-| Smart contract | `TaskEscrow.sol` @ `0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f` (Base Mainnet, verified, 34/34 tests) |
+| Smart contract | `TaskEscrowV2.sol` (see Contract Addresses below) |
 | Backend | Node.js / Express on Railway |
 | Database | **SQLite** (`nova.db`) — local file, mapped to Railway `/data` volume in prod |
 | AI | **Claude Sonnet only** — single model, no routing |
-| Payments | Stripe Checkout → webhook → `TaskEscrow.lock()` |
+| Payments | Stripe Checkout → webhook → `TaskEscrowV2.lock()` |
 | Auth | Email collected at Stripe checkout. MetaMask address passed as `client_reference_id`. No JWT, no sessions. |
 | Frontend | Next.js on Vercel Hobby (`zylogen.xyz`) |
 | Chain | **Base** (Sepolia for testing, Mainnet for prod) |
 | Token | **USDC** (6 decimals). Lock amount: `$9.00` = `9000000` |
+
+### Contract Addresses (canonical)
+
+There are two `TaskEscrowV2.sol` source files in the repo — they implement different protocols. Do not confuse them.
+
+| Deployment | Source | Network | Address | Status |
+|------------|--------|---------|---------|--------|
+| **TaskEscrow V1** (legacy reference) | `contracts/contracts/TaskEscrow.sol` | Base Mainnet | `0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f` | Verified, 34/34 tests, **not consumed by current backend** |
+| **TaskEscrowV2 (Nova)** | `contracts/contracts/TaskEscrowV2.sol` | Base Mainnet | `0xBE464859Fb6f09fa93b6212f616F3AD19ebe48B1` | **Live production** target of `paymentRelay.js` |
+| **TaskEscrowV2 (ZYL Genesis)** | `contracts/contracts/zyl/TaskEscrowV2.sol` | Base Sepolia | `0x9b1516C79855F8E01A5Eb4B4E3A34430041Ae254` | Beta — adds ZYL burn + Spark rewards on top of V2. Not yet on mainnet. |
+
+The Stripe → on-chain relayer (`backend/src/services/paymentRelay.js`) reads `TASK_ESCROW_ADDRESS` from env. Local Sepolia testing uses the ZYL Genesis address; Railway prod uses the Nova V2 address.
 
 ### What is DEFERRED (do not build until Logen approves Phase 3)
 - ❌ Privy embedded wallets — use MetaMask first
