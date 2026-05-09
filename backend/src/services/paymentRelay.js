@@ -249,21 +249,6 @@ function rawBodyMiddleware(req, res, next) {
 async function handleStripeWebhook(req, res) {
   const sig = req.headers["stripe-signature"];
 
-  // [DIAG] Temporary diagnostic — remove after webhook signature is verified
-  const _whsec = process.env.STRIPE_WEBHOOK_SECRET || "";
-  const _body = req.rawBody || "";
-  webhookLog.info({
-    diag: true,
-    whsecLen: _whsec.length,
-    whsecPrefix: _whsec.slice(0, 12),
-    whsecSuffix: _whsec.slice(-4),
-    bodyLen: _body.length,
-    bodyPrefix: _body.slice(0, 60),
-    bodyType: typeof req.rawBody,
-    sigHeader: sig ? sig.slice(0, 30) + "..." : "MISSING",
-    contentType: req.headers["content-type"]
-  }, "[DIAG] webhook received");
-
   let event;
   try {
     event = getStripe().webhooks.constructEvent(
@@ -272,7 +257,7 @@ async function handleStripeWebhook(req, res) {
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    webhookLog.error({ err: err.message }, "Invalid webhook signature");
+    webhookLog.error({ err }, "Invalid webhook signature");
     return res.status(400).json({ error: "Invalid signature" });
   }
 
