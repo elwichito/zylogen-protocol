@@ -15,10 +15,10 @@ Estados: `[ ]` pending · `[~]` in progress · `[x]` done · `[s]` skipped (con 
 **Objetivo:** El repo refleja la realidad. Las reglas operativas están escritas. Cualquier sesión futura puede arrancar desde acá sin arqueología.
 
 - [x] PR #2 abierto: dotenv fix + cleanup estructural (Phases A/B/C, +156/−3586) — 2026-05-09
-- [ ] Mergear PR #2
-- [ ] Empujar Phase D del PR #2 (`.github/workflows/test.yml`) — bloqueado en `gh auth refresh -s workflow`
+- [x] Mergear PR #2 — 2026-05-10 (squash, branch eliminado en remoto)
+- [x] Empujar Phase D del PR #2 (`.github/workflows/test.yml`) — 2026-05-10, vía PR aparte
 - [x] Memoria estratégica creada: norte, Railway projects, prod env, verification gate, structural cleanup
-- [~] Documentos operativos creados: `WORKFLOW.md`, `ROADMAP.md`, `SESSIONS.md` (este PR)
+- [x] Documentos operativos creados: `WORKFLOW.md`, `ROADMAP.md`, `SESSIONS.md` — PR #3 mergeado 2026-05-10
 - [ ] Decidir destino de Railway `strong-enthusiasm` (staging oficial o eliminar)
 
 ---
