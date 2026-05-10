@@ -6,6 +6,12 @@
 [![Network: Base Mainnet](https://img.shields.io/badge/Network-Base%20Mainnet-0052FF?logo=coinbase)](https://basescan.org/address/0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f)
 [![Live Demo](https://img.shields.io/badge/Demo-Live-brightgreen)](https://frontend-phi-five-49.vercel.app)
 
+> ⚠️ **This README describes the original Oracle-based vision.**
+> The Phase 2 MVP that is actually live (Stripe → `TaskEscrowV2.lock()` via the
+> Express webhook in `backend/`) is documented in [`CLAUDE.md`](./CLAUDE.md),
+> which is the source of truth for the current stack. The standalone Oracle
+> process lives in `_archived/oracle.js` and is not part of the live system.
+
 ---
 
 ## Overview
@@ -158,11 +164,17 @@ npx hardhat ignition deploy ./ignition/modules/TaskEscrow.js --network base
 
 ### Start the Oracle
 
+> Archived. The standalone oracle process described below is no longer
+> the live system — see the banner at the top of this file. The historical
+> code lives at `_archived/oracle.js`. The Phase 2 MVP runs validation
+> synchronously inside the Express webhook handler in
+> `backend/src/services/paymentRelay.js`.
+
 ```bash
-node scripts/oracle.js
+node _archived/oracle.js   # historical reference only
 ```
 
-The oracle connects to Base Mainnet, subscribes to `TaskCreated` events, and begins validating tasks autonomously. A heartbeat log line is printed every 60 seconds to confirm the process is alive.
+When it was the active process, the oracle connected to Base Mainnet, subscribed to `TaskCreated` events, and validated tasks autonomously, printing a heartbeat log line every 60 seconds.
 
 ---
 

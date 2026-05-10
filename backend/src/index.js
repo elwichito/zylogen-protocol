@@ -1,6 +1,13 @@
 "use strict";
 
-require("dotenv").config({ path: require("path").resolve(__dirname, "../../.env") });
+// Load backend/.env first (takes precedence), then fall back to repo root .env.
+// In production (Railway), env vars are injected directly and dotenv is a no-op.
+{
+  const path = require("path");
+  const dotenv = require("dotenv");
+  dotenv.config({ path: path.resolve(__dirname, "../.env") });
+  dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+}
 
 const express   = require("express");
 const cors      = require("cors");

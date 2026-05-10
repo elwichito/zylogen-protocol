@@ -21,13 +21,11 @@ Items flagged for cleanup. None of these block the current sprint. Resolve post-
 
 ---
 
-### 2. Legacy `oracle.js` at repo root
+### 2. Legacy `oracle.js` at repo root — DONE 2026-05-09
 
-**What:** `scripts/oracle.js` exists at the repo root using PostgreSQL + OpenAI — both deferred per Honest Manifest.
+**What:** `scripts/oracle.js` used PostgreSQL + OpenAI — both deferred per Honest Manifest.
 
-**Fix:** Remove or archive once V2 is live and the pipeline is validated.
-
-**Risk:** Low. `.dockerignore` already excludes `scripts/` from Railway builds.
+**Fix applied:** moved to `_archived/oracle.js` with explanatory README. Not imported anywhere; safe to resurrect from git history if needed.
 
 ---
 
