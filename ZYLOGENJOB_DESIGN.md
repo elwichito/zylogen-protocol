@@ -331,13 +331,15 @@ The kernel inherits `ERC2771Context` and uses `_msgSender()` for all authorizati
 
 **(NF)** Founder onboarding flow needs gasless option. **(NS)** ERC-8183 §11 SHOULD-recommended.
 
-### 6.6 `Pausable` + `Ownable` (NOT in ERC-8183 base, but kept)
+### 6.6 `Pausable` with an immutable `PAUSER` role — **no Ownable**
 
-The kernel is `Pausable` (owner can pause new `createJob` and `fund` in case of a discovered vulnerability — existing jobs continue to settle and expire normally) and `Ownable` (owner sets the forwarder, never anything semantic per job).
+The kernel is `Pausable` (a designated `PAUSER` can pause new `createJob` and `fund` in case of a discovered vulnerability — existing jobs continue to settle and expire normally).
 
-This is intentionally minimal — owner cannot move funds, cancel jobs, or override status. Owner exists only as a circuit breaker.
+**No `Ownable`.** The kernel is fully immutable: the `PAUSER` address is set once at construction and cannot be changed afterwards. There is no admin role that can transfer ownership, modify parameters, upgrade logic, or rescue funds.
 
-**(SAF)** Audit hygiene. ERC-8183 doesn't forbid this.
+The `PAUSER` can do exactly two things: `pause()` and `unpause()`. Nothing else. It's a circuit breaker, not an admin.
+
+**(SAF)** Audit hygiene with minimum trust surface. **(KEPT)** Pause-only circuit breaker is the smallest viable safety net. ERC-8183 doesn't forbid pause.
 
 ### 6.7 ReentrancyGuard on every token-moving function
 
@@ -393,15 +395,21 @@ The point of every exclusion: **a founder who only wants ERC-8183 compliance mus
 
 ---
 
-## 8. Open questions for review
+## 8. Closed decisions (2026-05-11)
 
-These are not blockers, but they need your call before Fase 1.D coding begins:
+Each item below was an open question during design review; the operator's call on each is now binding for Fase 1.D coding.
 
-1. **`MAX_DURATION` constant value.** Proposed: 365 days. Alternatives: 90 days (forces shorter contracts), no max (founder-defined fully).
-2. **`paymentToken` immutable or owner-settable?** Proposed: immutable (deploy fresh kernel for new token). Alternative: owner-settable with a 24h timelock.
-3. **Hook gas limit?** ERC-8183 §8 says SHOULD impose. Proposed: 500,000 gas per call (enough for non-trivial hooks, prevents griefing). Alternative: no limit, trust the hook (less safe).
-4. **Should `ZylogenFeeHook` ship with this PR's design doc or be a separate design doc?** Proposed: separate doc (`ZYLOGENFEEHOOK_DESIGN.md` in a follow-up PR) so the kernel can be reviewed in isolation.
-5. **Network for V3 deploy:** Sepolia first (Fase 1.D), then mainnet (Fase 1.E). Same chains as the current contract.
+1. **`MAX_DURATION = 365 days`** (constant). A job's `expiredAt` MUST satisfy `expiredAt <= block.timestamp + 365 days`. Founders who need longer contracts deploy a fresh kernel with a custom constant.
+
+2. **`PAYMENT_TOKEN` is immutable.** Set at constructor, never settable. To use a different token, deploy a new kernel. No timelock-settable variant; no admin override. This is the single biggest contributor to the kernel being trust-minimised.
+
+3. **`HOOK_GAS_LIMIT = 500_000`** per hook call (each of `beforeAction` and `afterAction` gets its own 500k budget). Implemented via `hook.call{gas: 500_000}(...)`. If the hook reverts or runs out of gas, the calling function reverts.
+
+4. **`ZylogenFeeHook` is out of scope for Fase 1.** Fase 1 ships only the kernel (`ZylogenJob.sol`). The fee hook gets its own design doc and PR after the kernel is on mainnet. Until then, founders deploy `ZylogenJob` with `hook = address(0)`.
+
+5. **Deploy sequence:** Fase 1.D writes the contract; tests + Sepolia deploy in Fase 1.D-test; mainnet deploy only in Fase 1.E after an internal audit pass.
+
+6. **No `Ownable`.** This decision came in alongside the questions and overrides §6.6 above. The kernel is fully immutable; the only admin-like role is `PAUSER` (pause/unpause only, set once in constructor). See §6.6 for the rewritten rationale.
 
 ---
 
