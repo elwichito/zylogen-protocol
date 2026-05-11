@@ -23,16 +23,44 @@ Estados: `[ ]` pending · `[~]` in progress · `[x]` done · `[s]` skipped (con 
 
 ---
 
-## Fase 1 — SDK MVP funcional
+## Fase 1 — TaskEscrowV3 = ZylogenJob (ERC-8183 compliant)
 
-**Objetivo:** Un founder solo, con la npm-i del SDK más una clave de Base, puede `ZylogenAgent.deploy()` y obtener: AgentID, escrow contract address, y endpoint de payments. Documentación que haga el flujo claro en 30 minutos.
+**Objetivo:** Un founder solo, con `npm-i @zylogen/sdk` más una clave de Base, puede `ZylogenAgent.deploy()` y obtener: AgentID, escrow contract address, y endpoint de payments. Documentación que haga el flujo claro en 30 minutos.
 
-- [ ] Auditar `sdk/index.js` actual y su API pública — qué expone hoy vs qué necesita
-- [ ] Definir interfaz mínima: `deploy({ network, owner })` → `{ agentId, escrowAddress, paymentsUrl }`
-- [ ] Un quickstart en `sdk/README.md` con 5 comandos máximo
-- [ ] Test e2e del SDK en Sepolia (no mock — deploy real a testnet, asercion de address recuperable)
-- [ ] Publicar `@zylogen/sdk` v0.1.0 a npm
-- [ ] Documentar costo aproximado de gas para el deploy (Sepolia + estimado mainnet)
+**Decisión técnica (2026-05-11):** Opción C — deployar V3 limpio derivado de `contracts/contracts/zyl/TaskEscrowV2.sol`. Los 3 contratos legacy en Base mainnet (`0x55a8…`, `0xBE46…`, `0xC10D…`) no se tocan; se documentan en `DEPLOYMENTS.md`. La nueva SDK pública apunta SOLO al V3.
+
+- [x] Auditar `sdk/index.js` actual y su API pública — 2026-05-11, hallazgo: SDK apunta a `0xC10D…` que es un tercer contrato no documentado
+- [ ] Auditoría completa documentada en `DEPLOYMENTS.md` con los 3 contratos legacy
+
+### 1.A — Documentación de contratos legacy (semana 1)
+- [~] Crear `DEPLOYMENTS.md` con los 3 contratos en mainnet + sus interfaces + estado (este PR)
+- [ ] Actualizar `CLAUDE.md` para reflejar la realidad de 3 deployments (apunta al DEPLOYMENTS.md)
+- [ ] Marcar SDK actual (`zylogen-sdk` v2.1.1 en npm) como "deprecated" en su `sdk/README.md`
+
+### 1.B — ERC-8183 spec audit (semana 1-2)
+- [ ] Leer ERC-8183 spec completa (https://eips.ethereum.org/EIPS/eip-8183)
+- [ ] Producir tabla de requisitos MUST/SHOULD/MAY
+- [ ] Audit de `contracts/contracts/zyl/TaskEscrowV2.sol` vs requisitos → gaps documentados
+
+### 1.C — Diseño y escritura `ZylogenJob.sol` (semana 3)
+- [ ] Diseñar estados Open → Funded → Submitted → Terminal
+- [ ] Implementar evaluator role separado del oracle wallet
+- [ ] Agregar `attestationReason` hash on-chain
+- [ ] Hooks `afterAction` para composabilidad
+- [ ] SafeERC20 + ReentrancyGuard + Ownable + Pausable
+
+### 1.D — Testing y deploy Sepolia (semana 4)
+- [ ] Tests exhaustivos Hardhat (cobertura >90%)
+- [ ] Deploy en Base Sepolia
+- [ ] Tests e2e del SDK contra Sepolia
+- [ ] Documentar deploy en `DEPLOYMENTS.md`
+
+### 1.E — Audit interno + deploy Mainnet (semana 5-6)
+- [ ] Audit interno con checklist OpenZeppelin
+- [ ] `slither` / `mythril` clean
+- [ ] Deploy en Base Mainnet
+- [ ] SDK actualizada apuntando al V3
+- [ ] Publicar como `@zylogen/sdk` en npm (verificar disponibilidad del scope)
 
 ---
 
