@@ -30,36 +30,38 @@ Estados: `[ ]` pending · `[~]` in progress · `[x]` done · `[s]` skipped (con 
 **Decisión técnica (2026-05-11):** Opción C — deployar V3 limpio derivado de `contracts/contracts/zyl/TaskEscrowV2.sol`. Los 3 contratos legacy en Base mainnet (`0x55a8…`, `0xBE46…`, `0xC10D…`) no se tocan; se documentan en `DEPLOYMENTS.md`. La nueva SDK pública apunta SOLO al V3.
 
 - [x] Auditar `sdk/index.js` actual y su API pública — 2026-05-11, hallazgo: SDK apunta a `0xC10D…` que es un tercer contrato no documentado
-- [ ] Auditoría completa documentada en `DEPLOYMENTS.md` con los 3 contratos legacy
+- [x] Auditoría completa documentada en `DEPLOYMENTS.md` con los 3 contratos legacy — 2026-05-11
 
-### 1.A — Documentación de contratos legacy (semana 1)
-- [~] Crear `DEPLOYMENTS.md` con los 3 contratos en mainnet + sus interfaces + estado (este PR)
-- [ ] Actualizar `CLAUDE.md` para reflejar la realidad de 3 deployments (apunta al DEPLOYMENTS.md)
-- [ ] Marcar SDK actual (`zylogen-sdk` v2.1.1 en npm) como "deprecated" en su `sdk/README.md`
+### 1.A — Documentación de contratos legacy ✅ cerrada 2026-05-11
+- [x] Crear `DEPLOYMENTS.md` con los 3 contratos en mainnet + sus interfaces + estado — PR #6
+- [x] Actualizar `CLAUDE.md` para reflejar la realidad de 3 deployments (apunta al DEPLOYMENTS.md) — PR #7
+- [x] Marcar SDK actual (`zylogen-sdk` v2.1.1 en npm) como "deprecated" en su `sdk/README.md` — PR #7
 
-### 1.B — ERC-8183 spec audit (semana 1-2)
-- [ ] Leer ERC-8183 spec completa (https://eips.ethereum.org/EIPS/eip-8183)
-- [ ] Producir tabla de requisitos MUST/SHOULD/MAY
-- [ ] Audit de `contracts/contracts/zyl/TaskEscrowV2.sol` vs requisitos → gaps documentados
+### 1.B — ERC-8183 spec audit ✅ cerrada 2026-05-11
+- [x] Leer ERC-8183 spec completa (https://eips.ethereum.org/EIPS/eip-8183) — PR #8
+- [x] Producir tabla de requisitos MUST/SHOULD/MAY — PR #8 (21 MUST + 7 SHOULD + 8 MAY catalogados)
+- [x] Audit de `contracts/contracts/zyl/TaskEscrowV2.sol` vs requisitos → gaps documentados — PR #8 (7 BLOCKERS, 4 MAJOR, 3 MINOR)
 
-### 1.C — Diseño y escritura `ZylogenJob.sol` (semana 3)
-- [ ] Diseñar estados Open → Funded → Submitted → Terminal
-- [ ] Implementar evaluator role separado del oracle wallet
-- [ ] Agregar `attestationReason` hash on-chain
-- [ ] Hooks `afterAction` para composabilidad
-- [ ] SafeERC20 + ReentrancyGuard + Ownable + Pausable
+### 1.C — Diseño y escritura doc `ZylogenJob.sol` ✅ cerrada 2026-05-11
+- [x] Diseñar estados Open → Funded → Submitted → Terminal — PR #9
+- [x] Implementar evaluator role separado del oracle wallet — PR #9 (decisión)
+- [x] Agregar `attestationReason` hash on-chain (`bytes32 reason`) — PR #9 (decisión)
+- [x] Hooks `afterAction` para composabilidad (IACPHook) — PR #9 (interfaz)
+- [x] SafeERC20 + ReentrancyGuard + Pausable (sin Ownable per decisión 2026-05-11) — PR #9
 
-### 1.D — Testing y deploy Sepolia (semana 4)
-- [ ] Tests exhaustivos Hardhat (cobertura >90%)
+### 1.D — Implementación + Testing ✅ cerrada 2026-05-11
+- [x] Implementar `contracts/contracts/v3/ZylogenJob.sol` — PR #10 (438 LOC, compila clean)
+- [x] Tests exhaustivos Hardhat (cobertura >90%) — PR #11 (56 tests, statements 98.92% / lines 99.07%)
+- [ ] Deploy en Base Sepolia — pendiente Fase 1.E
+- [ ] Tests e2e del SDK contra Sepolia — pendiente, requiere SDK V3 first
+- [ ] Documentar deploy en `DEPLOYMENTS.md` — pendiente Fase 1.E
+
+### 1.E — Audit interno + deploy Mainnet 🎯 **NEXT UP**
 - [ ] Deploy en Base Sepolia
-- [ ] Tests e2e del SDK contra Sepolia
-- [ ] Documentar deploy en `DEPLOYMENTS.md`
-
-### 1.E — Audit interno + deploy Mainnet (semana 5-6)
 - [ ] Audit interno con checklist OpenZeppelin
 - [ ] `slither` / `mythril` clean
 - [ ] Deploy en Base Mainnet
-- [ ] SDK actualizada apuntando al V3
+- [ ] SDK V3 mínima apuntando al kernel mainnet
 - [ ] Publicar como `@zylogen/sdk` en npm (verificar disponibilidad del scope)
 
 ---

@@ -92,6 +92,53 @@ Mismo día, segunda mitad — Wichi ejecutó la secuencia de merge:
 
 ---
 
+## 2026-05-11 — Fase 1.A → 1.D completas (kernel V3 ERC-8183 listo para deploy)
+
+**Operator:** Wichi · **Asistente:** Zyl (Claude Code)
+
+### Qué se hizo
+
+Toda la Fase 1 del roadmap salvo el deploy a Sepolia y el audit, encadenada en una sola sesión:
+
+- **Fase 1.A — Documentación legacy** (cerrada).
+  - PR #6: `DEPLOYMENTS.md` con los 3 contratos legacy + tabla canónica + sub-fases 1.A–1.E.
+  - PR #7: `CLAUDE.md` con sección de Deployments apuntando a `DEPLOYMENTS.md`, y banner ⚠️ DEPRECATED al inicio de `sdk/README.md`.
+- **Fase 1.B — Audit ERC-8183** (cerrada).
+  - PR #8: `ERC8183_REQUIREMENTS.md` con tabla MUST/SHOULD/MAY (21+7+8 requisitos) auditando `contracts/contracts/zyl/TaskEscrowV2.sol`. 7 BLOCKERS, 4 MAJOR, 3 MINOR. Hallazgo crítico: `timeout()` actual paga al worker en vez del client — violación directa de M13.
+- **Fase 1.C — Diseño del kernel** (cerrada).
+  - PR #9: `ZYLOGENJOB_DESIGN.md` con arquitectura kernel + hook split, state machine, interfaces Solidity completas, 10 decisiones explícitas, lista de anti-features, y 5 open questions resueltas en el mismo PR (MAX_DURATION=365d, paymentToken immutable, hookGas=500k, FeeHook out-of-scope, Sepolia→mainnet, sin Ownable).
+- **Fase 1.D — Implementación + tests** (cerrada).
+  - PR #10: `contracts/contracts/v3/ZylogenJob.sol` (438 LOC) — pure ERC-8183, compila clean en 0.8.25, 49 sources totales en hardhat.
+  - PR #11: 56 tests Hardhat (5 categorías A-E) + 2 mocks (`TestACPHook.sol`, `ReentrantToken.sol`). Cobertura del kernel: **statements 98.92% · branches 94.59% · functions 95% · lines 99.07%**. Sin bugs encontrados en el contrato durante el desarrollo de tests.
+
+### Pendientes al cierre
+
+- **Fase 1.E** (siguiente sesión): deploy Sepolia, audit interno con checklist OpenZeppelin, slither/mythril, deploy mainnet, SDK mínima apuntando al V3, publicar `@zylogen/sdk` en npm.
+- Residual de Fase 0: decidir destino de Railway `strong-enthusiasm` (sin urgencia).
+
+### Blockers
+
+Ninguno.
+
+### Commits / PRs
+
+- PR #6 → mergeado (squash) — Fase 1.A.1
+- PR #7 → mergeado (squash) — Fase 1.A.2 + 1.A.3
+- PR #8 → mergeado (squash) — Fase 1.B
+- PR #9 → mergeado (squash) — Fase 1.C
+- PR #10 → mergeado (squash) — Fase 1.D impl
+- PR #11 → mergeado (squash) — Fase 1.D tests
+- Commit directo a `main` (`[fase-1d] close: ...`) — este housekeeping
+
+### Decisiones
+
+- **Opción C definitiva**: deployar V3 limpio en vez de patchear cualquiera de los 3 contratos legacy. Fase 1.A documenta legacy, Fase 1.C–D construye el V3.
+- **Hard split kernel + hook**: `ZylogenJob.sol` es 100% ERC-8183 puro; features Zylogen (fees, burn, spark, reputation) van a un `ZylogenFeeHook.sol` opcional cuyo diseño se posterga.
+- **Sin Ownable en el kernel**: el único rol admin es `PAUSER` (immutable, solo pause/unpause). Kernel completamente immutable, sin proxies.
+- **Tests categoría por categoría (A–E)** como contrato de calidad estable para todas las futuras versiones del kernel.
+
+---
+
 <!--
 Plantilla para nuevas entradas:
 
