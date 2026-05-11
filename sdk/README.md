@@ -1,5 +1,9 @@
 # Zylogen SDK
 
+> ⚠️ **DEPRECATED** — This SDK (v2.1.1) points to a legacy contract (`0xC10D…`).
+> The new SDK (`@zylogen/sdk` V3, ERC-8183 compliant) is in development.
+> Do not use this for new projects. See [DEPLOYMENTS.md](../DEPLOYMENTS.md).
+
 JavaScript SDK for [Zylogen Protocol](https://zylogen.xyz) — AI-validated escrow on Base L2.
 
 ## Install

@@ -24,17 +24,20 @@ This is the source of truth. Do not build anything outside this scope without Lo
 | Chain | **Base** (Sepolia for testing, Mainnet for prod) |
 | Token | **USDC** (6 decimals). Lock amount: `$9.00` = `9000000` |
 
-### Contract Addresses (canonical)
+### Deployments (3 contracts, see [DEPLOYMENTS.md](./DEPLOYMENTS.md))
 
-There are two `TaskEscrowV2.sol` source files in the repo — they implement different protocols. Do not confuse them.
+There are **three** TaskEscrow contracts deployed on Base Mainnet — only one is live, the other two are legacy. The authoritative catalog (with interfaces, bytecode lens, deprecation reasons) lives in [`DEPLOYMENTS.md`](./DEPLOYMENTS.md). What follows is a 30-second summary; consult the catalog before doing anything contract-related.
 
-| Deployment | Source | Network | Address | Status |
-|------------|--------|---------|---------|--------|
-| **TaskEscrow V1** (legacy reference) | `contracts/contracts/TaskEscrow.sol` | Base Mainnet | `0x55a8461ad87B5EAD0Fcc6f4474D8FaF32c1a451f` | Verified, 34/34 tests, **not consumed by current backend** |
-| **TaskEscrowV2 (Nova)** | `contracts/contracts/TaskEscrowV2.sol` | Base Mainnet | `0xBE464859Fb6f09fa93b6212f616F3AD19ebe48B1` | **Live production** target of `paymentRelay.js` |
-| **TaskEscrowV2 (ZYL Genesis)** | `contracts/contracts/zyl/TaskEscrowV2.sol` | Base Sepolia | `0x9b1516C79855F8E01A5Eb4B4E3A34430041Ae254` | Beta — adds ZYL burn + Spark rewards on top of V2. Not yet on mainnet. |
+| Address | Source | Network | Status |
+|---------|--------|---------|--------|
+| `0x55a8461a…451f` | `contracts/contracts/TaskEscrow.sol` | Base Mainnet | **Legacy V1** — ETH-only, not consumed by current backend |
+| `0xC10D9b26…832c` | (no source in repo — old iteration) | Base Mainnet | **Legacy "SDK abril"** — what the deprecated `zylogen-sdk` npm package points to |
+| `0xBE464859…48B1` | `contracts/contracts/TaskEscrowV2.sol` | Base Mainnet | **🟢 Nova prod** — `paymentRelay.js` target |
+| `0x9b1516C7…4254` | `contracts/contracts/zyl/TaskEscrowV2.sol` | Base Sepolia | Beta — ZYL Genesis (burn + Spark). Not on mainnet. |
 
 The Stripe → on-chain relayer (`backend/src/services/paymentRelay.js`) reads `TASK_ESCROW_ADDRESS` from env. Local Sepolia testing uses the ZYL Genesis address; Railway prod uses the Nova V2 address.
+
+**Decision 2026-05-11:** Build a V3 (`ZylogenJob.sol`, ERC-8183 compliant) instead of patching any of the three legacy ones. See `ROADMAP.md` Fase 1.
 
 ### What is DEFERRED (do not build until Logen approves Phase 3)
 - ❌ Privy embedded wallets — use MetaMask first
