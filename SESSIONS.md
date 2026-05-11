@@ -74,6 +74,21 @@ Mismo día, segunda mitad — Wichi ejecutó la secuencia de merge:
 - PR #2 (`claude/funny-galileo-e285a2`) → mergeado con squash el 2026-05-10
 - PR #3 (`claude/fase-0-ops`) → mergeado con squash el 2026-05-10 (dejó en `main` los 3 documentos operativos)
 - PR #4 (`claude/ci-and-session-close`) → CI workflow + este cierre de SESSIONS
+- PR #5 (`claude/close-session-2026-05-10`) → este append con el resumen ejecutivo
+
+### Cierre de sesión
+
+**3 PRs mergeados:**
+- PR #2 — dotenv fix + structural cleanup
+- PR #3 — operational system (WORKFLOW + ROADMAP + SESSIONS)
+- PR #4 — CI workflow + session close
+
+**Fase 0: sustancialmente cerrada.** Pendiente residual: Railway `strong-enthusiasm`.
+
+**Próxima sesión: arrancar Fase 1.**
+1. Auditar `sdk/index.js` actual
+2. Definir interfaz mínima `ZylogenAgent.deploy()`
+3. Leer ERC-8183 spec completa
 
 ---
 
