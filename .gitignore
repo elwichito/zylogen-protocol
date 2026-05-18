@@ -2,6 +2,9 @@ node_modules/
 .env
 .env.local
 .env.*
+# Always track committed examples — templates with no secrets.
+!.env.example
+!**/.env.example
 
 # SQLite — Railway uses /data volume; never commit the local DB
 backend/nova.db
