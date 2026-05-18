@@ -9,7 +9,7 @@ const express = require("express");
 const Stripe  = require("stripe");
 const db      = require("../db/sqlite");
 const { nova: log } = require("../lib/logger");
-const { processClientMessage, handleSupportQuestion, getPlatformStats } = require("../agents/novaBrain");
+const { processClientMessage, chatWithNova, handleSupportQuestion, getPlatformStats } = require("../agents/novaBrain");
 const { releasePayment }       = require("../services/paymentRelay");
 const { sendPaymentConfirmedEmail, sendKitDeliveredEmail } = require("../services/email");
 const { generateAndSaveKit, markKitDelivered } = require("../services/kitGenerator");
@@ -139,15 +139,16 @@ router.post("/checkout", async (req, res) => {
 // Gate: email must have a locked escrow record
 
 router.post("/message", async (req, res) => {
-  const { email, message } = req.body;
+  const { email, message, history } = req.body;
 
   if (!email || !message) {
     return res.status(400).json({ error: "email and message required" });
   }
 
-  // Simple payment gate — check SQLite for a locked record
+  // Simple payment gate — check SQLite for a locked or released record.
+  // `released` is included so a user with a settled escrow can still chat.
   const paid = db.prepare(
-    `SELECT id FROM escrow_records WHERE client_email = ? AND status = 'locked' LIMIT 1`
+    `SELECT id FROM escrow_records WHERE client_email = ? AND status IN ('locked','released') LIMIT 1`
   ).get(email);
 
   if (!paid) {
@@ -155,61 +156,11 @@ router.post("/message", async (req, res) => {
   }
 
   try {
-    const result = await processClientMessage(email, message.trim());
-
-    // Auto-generate branding kit when briefing is complete
-    if (result.stage === "brief_complete") {
-      log.info({ email }, "Brief complete - starting auto kit generation");
-
-      // Fire-and-forget kit generation (runs in background)
-      generateAndSaveKit(email)
-        .then((kit) => {
-          log.info({ email }, "Auto-generated kit ready");
-
-          // Mark as delivered and update stage
-          markKitDelivered(email, kit);
-
-          // Trigger on-chain settlement
-          const record = db.prepare(
-            `SELECT escrow_id FROM escrow_records WHERE client_email = ? AND status = 'locked' LIMIT 1`
-          ).get(email);
-
-          if (record?.escrow_id) {
-            releasePayment(record.escrow_id, email).catch((err) =>
-              log.error({ err, email, escrowId: record.escrow_id }, "Release payment failed")
-            );
-          }
-
-          // Send kit delivered email
-          sendKitDeliveredEmail(email, kit).catch((err) =>
-            log.error({ err, email }, "Kit delivered email failed")
-          );
-        })
-        .catch((err) => {
-          log.error({ err, email }, "Auto kit generation failed");
-          // Kit generation failed - leave delivery_status as 'pending' for manual intervention
-        });
-    }
-
-    // Trigger on-chain settlement and send email when kit is delivered for the first time
-    if (result.stage === "kit_delivered") {
-      const record = db.prepare(
-        `SELECT escrow_id FROM escrow_records WHERE client_email = ? AND status = 'locked' LIMIT 1`
-      ).get(email);
-
-      if (record?.escrow_id) {
-        releasePayment(record.escrow_id, email).catch((err) =>
-          log.error({ err, email, escrowId: record.escrow_id }, "Release payment failed")
-        );
-      }
-
-      // Send kit delivered email (fire-and-forget)
-      sendKitDeliveredEmail(email, result.kit || null).catch((err) =>
-        log.error({ err, email }, "Kit delivered email failed")
-      );
-    }
-
-    res.json(result);
+    // Simplified Nova: stateless consultant chat. No briefing flow, no kit
+    // generation. The chat itself is the deliverable. The client passes
+    // recent conversation history so Claude has context.
+    const reply = await chatWithNova(email, message.trim(), history);
+    res.json({ reply });
   } catch (err) {
     log.error({ err, email }, "Nova message processing failed");
     res.status(500).json({ error: "Nova encountered an error." });

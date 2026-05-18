@@ -251,15 +251,15 @@ export default function NovaPage() {
 
       {/* ── Hero ── */}
       <section style={s.hero}>
-        <p style={s.eyebrow}>Nova · AI Branding Consultant</p>
+        <p style={s.eyebrow}>Nova · 1:1 AI Consultant</p>
         <h1 style={s.headline}>
-          Your brand,<br />
-          <em style={s.accent}>architected.</em>
+          Your founder's<br />
+          <em style={s.accent}>thinking partner.</em>
         </h1>
         <p style={s.subline}>
-          A complete Instagram identity system — brand voice, visual language,
-          30-day content strategy — delivered by an AI consultant trained on
-          what actually converts.
+          A direct chat with Nova — your AI consultant for naming, copy,
+          go-to-market, and the hard product decisions a solo founder makes
+          alone. Pay once, talk as long as you need.
         </p>
         {/* Referral badge */}
         {referralValid && (
@@ -379,10 +379,10 @@ export default function NovaPage() {
       {/* ── Features ── */}
       <section style={s.features}>
         {[
-          ["Brand Identity",   "Tagline, bio, brand promise, and CTA — ready to copy-paste."],
-          ["Visual System",    "Color palette, font pairing, and mood board in your voice."],
-          ["Content Strategy", "30-day launch plan, 10 hashtag sets, and 5 viral hooks."],
-          ["Voice Guide",      "Dos, don'ts, and 3 example captions in your exact tone."],
+          ["Direct chat",      "1:1 conversation. No tickets, no queue, no agency middleman."],
+          ["Founder context",  "Trained for solo founders on Base — no-budget, no-team realities."],
+          ["Strategy on tap",  "Naming, positioning, copy, GTM, hard product calls — ask anything."],
+          ["Escrowed payment", "USDC locked on Base. You get value before the funds settle."],
         ].map(([t, d]) => (
           <div key={t} style={s.featureItem}>
             <span style={s.featureTitle}>{t}</span>

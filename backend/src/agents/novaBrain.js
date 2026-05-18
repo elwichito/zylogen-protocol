@@ -299,4 +299,77 @@ function getPlatformStats() {
   };
 }
 
-module.exports = { processClientMessage, handleSupportQuestion, getPlatformStats };
+// ─── Simplified chat (Phase: post-brand-kit) ───────────────────────────────
+//
+// New Nova UX: stateless 1:1 consultant chat. No briefing flow, no kit
+// generation, no stage machine. The chat is the deliverable.
+//
+// Conversation memory comes from the client — the frontend sends the last
+// N exchanges in `history` so Claude has context without us needing a new
+// DB table.
+
+const NOVA_CONSULTANT_SYSTEM = {
+  en: `You are Nova, a 1:1 AI consultant for solo founders building agentic protocols, web3 products, and AI businesses on Base.
+
+You're the founder's thinking partner — direct, concrete, and short. No bullet salads, no corporate fluff. You speak the founder's language (mirror the user's tone).
+
+Defaults:
+- Be honest. Push back when an idea has obvious holes. Don't sugar-coat.
+- Be concrete. Give specific examples, names, links, code snippets if useful.
+- Be brief. If a sentence works, don't write three.
+- Stay in scope. You're a strategic consultant, not a code-completion tool.
+
+You can help with: brand positioning, naming, copy, go-to-market for a single solo founder with no budget, AI/web3 product decisions, Base ecosystem advice, and getting unstuck. If the user asks something far outside this scope (medical, legal, financial advice they should get from a professional), say so and refocus them.`,
+
+  es: `Sos Nova, una consultora 1:1 de IA para founders solos construyendo protocolos agentic, productos web3 y negocios de IA sobre Base.
+
+Sos la pensadora del founder — directa, concreta, breve. Nada de ensaladas de bullets, nada de corporate fluff. Hablás como el usuario (espejá su tono).
+
+Defaults:
+- Sé honesta. Empujá cuando una idea tiene agujeros obvios. No le des azúcar.
+- Sé concreta. Da ejemplos específicos, nombres, links, snippets de código si sirve.
+- Sé breve. Si una oración alcanza, no escribas tres.
+- Quedate en scope. Sos consultora estratégica, no autocomplete.
+
+Podés ayudar con: posicionamiento de marca, naming, copy, go-to-market para un founder solo sin presupuesto, decisiones de producto IA/web3, ecosistema Base, y destrabar bloqueos. Si preguntan algo muy fuera de scope (médico, legal, financiero profesional), aclaralo y reenfocá.`,
+};
+
+/**
+ * Stateless 1:1 chat with Nova. The caller MAY pass `history` (an array of
+ * { role: "user"|"assistant", content: string }) to give Claude conversation
+ * context. The kernel never persists history — that's the client's job.
+ *
+ * @param {string} email        Authenticated email (already gated upstream)
+ * @param {string} userMessage  Current user message
+ * @param {Array}  [history]    Previous turns, oldest first. Truncated to ~20.
+ * @returns {Promise<string>}   Nova's reply
+ */
+async function chatWithNova(email, userMessage, history = []) {
+  // Pick language from the current message first; fall back to history.
+  const lang = detectLanguage(userMessage) === "es"
+    ? "es"
+    : (history.length && history.some((m) => detectLanguage(m.content || "") === "es") ? "es" : "en");
+
+  // Bound history at 20 turns to keep prompts cheap. Drop anything that isn't
+  // a sane {role, content} pair so a malformed client can't poison the call.
+  const safeHistory = (Array.isArray(history) ? history : [])
+    .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+    .slice(-20)
+    .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }));
+
+  const messages = [
+    ...safeHistory,
+    { role: "user", content: userMessage.slice(0, 4000) },
+  ];
+
+  const response = await getAnthropic().messages.create({
+    model: MODEL,
+    max_tokens: 800,
+    system: NOVA_CONSULTANT_SYSTEM[lang],
+    messages,
+  });
+
+  return response.content[0].text;
+}
+
+module.exports = { processClientMessage, chatWithNova, handleSupportQuestion, getPlatformStats };

@@ -1,21 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-
-type Stage = "not_started" | "briefing_q1" | "briefing_q2" | "briefing_q3" | "brief_complete" | "kit_delivered";
-type Lang = "en" | "es";
-
-interface StatusData {
-  stage: Stage;
-  language?: Lang;
-  deliveryStatus?: string | null;
-  kit?: object | null;
-  referralCode?: string | null;
-  referralCount?: number;
-  wasReferred?: boolean;
-}
 
 interface ScarcityData {
   remaining: number;
@@ -23,67 +10,39 @@ interface ScarcityData {
   cap: number;
 }
 
+interface ChatMessage {
+  role: "user" | "nova";
+  text: string;
+}
+
+interface StatusData {
+  stage?: string;          // legacy field; we no longer drive UI off this
+  hasPaid?: boolean;       // optional new field; we infer from stage anyway
+  referralCode?: string | null;
+  referralCount?: number;
+}
+
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
-const POLL_MS = 6000;
-const SCARCITY_POLL_MS = 30_000;
+const SCARCITY_POLL_MS = 60_000;
+const HISTORY_LIMIT = 20;
 
-// ─── Chip definitions ───────────────────────────────────────────────────────
-
-const BUSINESS_CHIPS: Record<Lang, string[]> = {
-  en: ["Pet brand", "Fashion", "Food & Drink", "Tech / SaaS", "Beauty", "Services"],
-  es: ["Mascotas", "Moda", "Comida y Bebida", "Tech / Software", "Belleza", "Servicios"],
-};
-
-const VIBE_CHIPS: Record<Lang, { label: string; emoji: string }[]> = {
-  en: [
-    { emoji: "🤍", label: "Minimal" },
-    { emoji: "🌈", label: "Vibrant" },
-    { emoji: "📜", label: "Vintage" },
-    { emoji: "⚡", label: "Tech / Cyber" },
-    { emoji: "🌿", label: "Organic" },
-    { emoji: "💎", label: "Luxury" },
-  ],
-  es: [
-    { emoji: "🤍", label: "Minimalista" },
-    { emoji: "🌈", label: "Vibrante" },
-    { emoji: "📜", label: "Vintage" },
-    { emoji: "⚡", label: "Tech / Ciberpunk" },
-    { emoji: "🌿", label: "Orgánico" },
-    { emoji: "💎", label: "Lujo" },
-  ],
-};
-
-const OTHER_LABEL: Record<Lang, string> = { en: "Other", es: "Otro" };
-
-// ─── Main component ─────────────────────────────────────────────────────────
+// ─── Component ──────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const [email, setEmail] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [status, setStatus] = useState<StatusData | null>(null);
   const [scarcity, setScarcity] = useState<ScarcityData | null>(null);
-  const [message, setMessage] = useState("");
-  const [chatLog, setChatLog] = useState<{ role: "user" | "nova"; text: string }[]>([]);
+  const [chatLog, setChatLog] = useState<ChatMessage[]>([]);
+  const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedVibes, setSelectedVibes] = useState<string[]>([]);
-  const [showOtherInput, setShowOtherInput] = useState(false);
-  const [copySuccess, setCopySuccess] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
 
-  const lang: Lang = status?.language === "es" ? "es" : "en";
+  const logRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Copy referral link to clipboard
-  const copyReferralLink = () => {
-    if (!status?.referralCode) return;
-    const link = `https://zylogen.xyz/nova?ref=${status.referralCode}`;
-    navigator.clipboard.writeText(link).then(() => {
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
-    });
-  };
-
-  // ─── Read params from URL ───────────────────────────────────────────────
-
+  // ── URL params ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (typeof window === "undefined") return;
     const p = new URLSearchParams(window.location.search);
@@ -91,111 +50,123 @@ export default function DashboardPage() {
     setTxHash(p.get("tx"));
   }, []);
 
-  // ─── Poll status ────────────────────────────────────────────────────────
-
-  const fetchStatus = useCallback(async () => {
+  // ── Poll /status to confirm escrow is locked, then unlock UI ──────────────
+  useEffect(() => {
     if (!email) return;
-    try {
-      const res = await fetch(`${BACKEND}/api/nova/status?email=${encodeURIComponent(email)}`);
-      const data: StatusData = await res.json();
-      setStatus(data);
-    } catch { /* keep polling */ }
+    let alive = true;
+
+    async function fetchStatus() {
+      try {
+        const res = await fetch(`${BACKEND}/api/nova/status?email=${encodeURIComponent(email!)}`);
+        const data: StatusData = await res.json();
+        if (!alive) return;
+        setStatus(data);
+        // Stage is non-null once the webhook lands the escrow row. We treat
+        // ANY value other than "not_started" as "paid" for unlocking the
+        // chat. The chat itself is the deliverable.
+        if (data.stage && data.stage !== "not_started") setUnlocked(true);
+      } catch {/* keep polling */}
+    }
+
+    fetchStatus();
+    const id = setInterval(fetchStatus, 4000);
+    return () => { alive = false; clearInterval(id); };
   }, [email]);
 
-  useEffect(() => {
-    fetchStatus();
-    const id = setInterval(fetchStatus, POLL_MS);
-    return () => clearInterval(id);
-  }, [fetchStatus]);
-
-  // ─── Poll scarcity ──────────────────────────────────────────────────────
-
+  // ── Scarcity ──────────────────────────────────────────────────────────────
   useEffect(() => {
     async function fetchScarcity() {
       try {
         const res = await fetch(`${BACKEND}/api/nova/scarcity`, { cache: "no-store" });
-        const data: ScarcityData = await res.json();
-        setScarcity(data);
-      } catch { /* ignore */ }
+        setScarcity(await res.json());
+      } catch {/* ignore */}
     }
     fetchScarcity();
     const id = setInterval(fetchScarcity, SCARCITY_POLL_MS);
     return () => clearInterval(id);
   }, []);
 
-  // ─── Send message ───────────────────────────────────────────────────────
+  // ── Welcome message once chat unlocks ─────────────────────────────────────
+  useEffect(() => {
+    if (!unlocked || chatLog.length > 0) return;
+    setChatLog([{
+      role: "nova",
+      text:
+        "Welcome. I'm Nova — your 1:1 consultant for the time you sit down to think about your project.\n\n" +
+        "Brand, naming, copy, go-to-market, AI / web3 / Base stack decisions — ask me anything. I keep it short and direct.\n\n" +
+        "What are you working on?",
+    }]);
+  }, [unlocked, chatLog.length]);
 
-  const sendMessage = useCallback(async (text?: string) => {
-    const msg = (text ?? message).trim();
-    if (!msg || !email) return;
-    setMessage("");
+  // ── Auto-scroll on new message ────────────────────────────────────────────
+  useEffect(() => {
+    if (!logRef.current) return;
+    logRef.current.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
+  }, [chatLog, sending]);
+
+  // ── Focus input on unlock ────────────────────────────────────────────────
+  useEffect(() => {
+    if (unlocked && inputRef.current) inputRef.current.focus();
+  }, [unlocked]);
+
+  // ── Send ──────────────────────────────────────────────────────────────────
+  const send = useCallback(async () => {
+    const text = draft.trim();
+    if (!text || !email || sending) return;
+
+    setDraft("");
+    setError(null);
     setSending(true);
-    setShowOtherInput(false);
-    setChatLog((prev) => [...prev, { role: "user", text: msg }]);
+    const userTurn: ChatMessage = { role: "user", text };
+    const nextLog = [...chatLog, userTurn];
+    setChatLog(nextLog);
+
+    // History payload: oldest→newest, last HISTORY_LIMIT turns BEFORE the
+    // current user message (which the backend treats as `message`).
+    const history = chatLog.slice(-HISTORY_LIMIT).map((m) => ({
+      role: m.role === "nova" ? "assistant" : "user",
+      content: m.text,
+    }));
 
     try {
       const res = await fetch(`${BACKEND}/api/nova/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, message: msg }),
+        body: JSON.stringify({ email, message: text, history }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Nova error");
-
-      if (data.reply) setChatLog((prev) => [...prev, { role: "nova", text: data.reply }]);
-      fetchStatus();
+      if (!res.ok) throw new Error(data.error ?? "nova_error");
+      setChatLog([...nextLog, { role: "nova", text: data.reply ?? "(no reply)" }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Nova error");
     } finally {
       setSending(false);
-      setSelectedVibes([]);
+      setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [message, email, fetchStatus]);
+  }, [draft, email, sending, chatLog]);
 
-  // ─── Chip handlers ──────────────────────────────────────────────────────
-
-  const handleBusinessChip = (label: string) => {
-    if (label === OTHER_LABEL[lang]) {
-      setShowOtherInput(true);
-      return;
-    }
-    sendMessage(label);
-  };
-
-  const handleVibeToggle = (label: string) => {
-    setSelectedVibes((prev) => {
-      if (prev.includes(label)) return prev.filter((v) => v !== label);
-      if (prev.length >= 2) return prev;
-      return [...prev, label];
-    });
-  };
-
-  const submitVibes = () => {
-    if (selectedVibes.length === 0) return;
-    sendMessage(selectedVibes.join(", "));
-  };
-
-  // ─── Derived ────────────────────────────────────────────────────────────
-
-  const stage = status?.stage ?? "not_started";
-  const briefComplete = stage === "brief_complete" || stage === "kit_delivered";
-  const isQ1 = stage === "briefing_q1";
-  const isQ2 = stage === "briefing_q2";
-  const isQ3 = stage === "briefing_q3";
-
-  // ─── No session ─────────────────────────────────────────────────────────
-
+  // ── No session ────────────────────────────────────────────────────────────
   if (!email) {
     return (
       <main style={s.page}>
-        <p style={s.dim}>No session found. <a href="/nova" style={{ color: "#00e5ff" }}>Return to Nova →</a></p>
+        <FxStyle />
+        <header style={s.header}>
+          <span style={s.wordmark}>ZYLOGEN · NOVA</span>
+        </header>
+        <p style={s.dim}>
+          No session found.{" "}
+          <a href="/nova" style={{ color: "#00e5ff" }}>Return to Nova →</a>
+        </p>
       </main>
     );
   }
 
   return (
     <main style={s.page}>
-      {/* ── Header with scarcity badge ── */}
+      <FxStyle />
+      <div style={s.scanlines} aria-hidden />
+
+      {/* ── Header ── */}
       <header style={s.header}>
         <span style={s.wordmark}>ZYLOGEN · NOVA</span>
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -208,7 +179,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* ── On-chain confirmation ── */}
+      {/* ── Payment confirmed banner ── */}
       <div style={s.confirmBanner}>
         <span style={s.confirmDot} />
         <span style={s.confirmText}>Payment confirmed on Base</span>
@@ -219,197 +190,204 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* ── Referral Share Card ── */}
-      {status?.referralCode && (
-        <div style={s.referralCard}>
-          <div style={s.referralHeader}>
-            <span style={s.referralTitle}>Share & Earn</span>
-            {(status.referralCount ?? 0) > 0 && (
-              <span style={s.referralBadge}>{status.referralCount} referred</span>
-            )}
-          </div>
-          <p style={s.referralDesc}>
-            {lang === "es"
-              ? "Invita a otros fundadores. Pronto recompensaremos a los referidos."
-              : "Invite other founders. Referral rewards coming soon."}
+      {/* ── Loading state ── */}
+      {!unlocked && (
+        <div style={s.loadingBox}>
+          <span style={s.loadingPulse} />
+          <p style={s.loadingText}>Establishing secure session with Nova…</p>
+          <p style={s.dimSmall}>
+            This usually takes a few seconds while the on-chain lock confirms.
           </p>
-          <div style={s.referralLinkRow}>
-            <input
-              type="text"
-              readOnly
-              value={`zylogen.xyz/nova?ref=${status.referralCode}`}
-              style={s.referralInput}
-            />
-            <button onClick={copyReferralLink} style={s.copyBtn}>
-              {copySuccess ? (lang === "es" ? "Copiado" : "Copied") : (lang === "es" ? "Copiar" : "Copy")}
-            </button>
-          </div>
-          <div style={s.shareButtons}>
-            <a
-              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent("I just joined the Founding 100 at Zylogen. Get your AI branding kit:")}&url=${encodeURIComponent(`https://zylogen.xyz/nova?ref=${status.referralCode}`)}`}
-              target="_blank"
-              rel="noreferrer"
-              style={s.shareBtn}
-            >
-              Share on X
-            </a>
-          </div>
         </div>
       )}
 
-      {/* ── Stage indicator ── */}
-      <div style={s.stageRow}>
-        <span style={s.stageLabel}>
-          {stage === "not_started" ? (lang === "es" ? "⏳ Nova está inicializando…" : "⏳ Nova is initialising…")
-            : briefComplete ? (lang === "es" ? "✓ Brief recibido — entrega en 24h" : "✓ Brief received — delivery within 24h")
-            : (lang === "es" ? "💬 Nova está lista — responde abajo" : "💬 Nova is ready — respond below")}
-        </span>
-      </div>
+      {/* ── Chat ── */}
+      {unlocked && (
+        <section style={s.chatPanel}>
+          <div style={s.chatTermBar}>
+            <span style={s.chatTermDot} />
+            <span style={s.chatTermPrompt}>nova@zylogen:~</span>
+            <span style={s.chatTermStatus}>{sending ? "● thinking" : "● ready"}</span>
+          </div>
 
-      {/* ── Chat interface ── */}
-      {status && stage !== "not_started" && (
-        <div style={s.chatWrap}>
-          <div style={s.chatLog}>
-            {chatLog.length === 0 && !briefComplete && (
-              <p style={s.chatPlaceholder}>
-                {lang === "es"
-                  ? "Envía un saludo para comenzar. Nova detectará tu idioma automáticamente."
-                  : "Send a greeting to begin. Nova will detect your language automatically."}
-              </p>
-            )}
+          <div ref={logRef} style={s.chatLog}>
             {chatLog.map((m, i) => (
-              <div key={i} style={{ ...s.bubble, ...(m.role === "user" ? s.bubbleUser : s.bubbleNova) }}>
+              <div
+                key={i}
+                style={{ ...s.bubble, ...(m.role === "user" ? s.bubbleUser : s.bubbleNova) }}
+                className={m.role === "nova" ? "nova-bubble-glow nova-fade-in" : "nova-fade-in"}
+              >
                 {m.text}
               </div>
             ))}
-            {sending && <div style={{ ...s.bubble, ...s.bubbleNova, opacity: 0.5 }}>Nova is thinking…</div>}
+            {sending && (
+              <div style={{ ...s.bubble, ...s.bubbleNova }} className="nova-bubble-glow">
+                <span className="nova-dots"><i /><i /><i /></span>
+              </div>
+            )}
           </div>
 
-          {/* ── Chips: Q1 business type ── */}
-          {isQ1 && !sending && !showOtherInput && (
-            <div style={s.chipWrap}>
-              {BUSINESS_CHIPS[lang].map((label) => (
-                <button key={label} style={s.chip} onClick={() => handleBusinessChip(label)}>
-                  {label}
-                </button>
-              ))}
-              <button style={{ ...s.chip, ...s.chipGhost }} onClick={() => handleBusinessChip(OTHER_LABEL[lang])}>
-                {OTHER_LABEL[lang]}
-              </button>
-            </div>
-          )}
+          <div style={s.inputRow}>
+            <span style={s.inputPrompt}>›</span>
+            <input
+              ref={inputRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              placeholder="Ask Nova anything…"
+              style={s.input}
+              disabled={sending}
+              maxLength={1000}
+            />
+            <button
+              onClick={send}
+              disabled={!draft.trim() || sending}
+              style={{ ...s.sendBtn, ...((!draft.trim() || sending) ? s.sendBtnDisabled : {}) }}
+            >
+              {sending ? "…" : "SEND"}
+            </button>
+          </div>
 
-          {/* ── Chips: Q2 vibe (multi-select) ── */}
-          {isQ2 && !sending && (
-            <div>
-              <div style={s.chipWrap}>
-                {VIBE_CHIPS[lang].map(({ emoji, label }) => (
-                  <button
-                    key={label}
-                    style={{
-                      ...s.chip,
-                      ...(selectedVibes.includes(label) ? s.chipSelected : {}),
-                    }}
-                    onClick={() => handleVibeToggle(label)}
-                  >
-                    {emoji} {label}
-                  </button>
-                ))}
-              </div>
-              {selectedVibes.length > 0 && (
-                <button style={s.submitVibesBtn} onClick={submitVibes}>
-                  {lang === "es" ? `Confirmar (${selectedVibes.length}/2)` : `Confirm (${selectedVibes.length}/2)`}
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* ── Input: Q3 free text or Q1 "Other" ── */}
-          {((isQ3 && !sending) || (isQ1 && showOtherInput && !sending)) && (
-            <div style={s.inputRow}>
-              <input
-                value={message}
-                onChange={(e) => setMessage(e.target.value.slice(0, 200))}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-                placeholder={isQ3
-                  ? (lang === "es" ? "Nombre de tu marca y qué hace (máx. 200 caracteres)" : "Your brand name and what it does (max 200 chars)")
-                  : (lang === "es" ? "Escribe tu tipo de negocio…" : "Type your business type…")}
-                style={s.chatInput}
-                maxLength={200}
-              />
-              <button onClick={() => sendMessage()} disabled={!message.trim()} style={s.sendBtn}>
-                {lang === "es" ? "Enviar" : "Send"}
-              </button>
-            </div>
-          )}
-
-          {/* ── Post-Q3 follow-up input ── */}
-          {briefComplete && (
-            <div style={s.inputRow}>
-              <input
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-                placeholder={lang === "es" ? "¿Alguna pregunta?" : "Any questions?"}
-                style={s.chatInput}
-              />
-              <button onClick={() => sendMessage()} disabled={sending || !message.trim()} style={s.sendBtn}>
-                {lang === "es" ? "Enviar" : "Send"}
-              </button>
-            </div>
-          )}
-
-          {error && <p style={s.errNote}>{error}</p>}
-        </div>
+          {error && <p style={s.errNote}>⚠ {error}</p>}
+        </section>
       )}
 
       <footer style={s.footer}>
         <span style={s.dim}>{email}</span>
+        {status?.referralCode && (
+          <span style={s.dim}>
+            ref: <span style={{ color: "#00e5ff" }}>{status.referralCode}</span>
+            {(status.referralCount ?? 0) > 0 && ` · ${status.referralCount} referred`}
+          </span>
+        )}
       </footer>
     </main>
+  );
+}
+
+// ─── FX styles (CSS keyframes — inline) ─────────────────────────────────────
+
+function FxStyle() {
+  return (
+    <style dangerouslySetInnerHTML={{ __html: `
+      @keyframes nova-fade-in {
+        from { opacity: 0; transform: translateY(4px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      .nova-fade-in { animation: nova-fade-in 200ms ease-out both; }
+
+      @keyframes nova-glow-pulse {
+        0%, 100% { box-shadow: 0 0 0 1px rgba(0, 255, 136, 0.30), 0 0 12px rgba(0, 255, 136, 0.15); }
+        50%      { box-shadow: 0 0 0 1px rgba(0, 255, 136, 0.45), 0 0 22px rgba(0, 255, 136, 0.28); }
+      }
+      .nova-bubble-glow { animation: nova-glow-pulse 4s ease-in-out infinite; }
+
+      @keyframes nova-dot-bounce {
+        0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+        40%           { opacity: 1;   transform: translateY(-3px); }
+      }
+      .nova-dots { display: inline-flex; gap: 4px; padding: 4px 2px; }
+      .nova-dots i {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: #00ff88;
+        animation: nova-dot-bounce 1.2s infinite ease-in-out;
+      }
+      .nova-dots i:nth-child(2) { animation-delay: 0.18s; }
+      .nova-dots i:nth-child(3) { animation-delay: 0.36s; }
+
+      @keyframes nova-status-pulse {
+        0%, 100% { opacity: 0.6; }
+        50%      { opacity: 1; }
+      }
+    ` }} />
   );
 }
 
 // ─── Styles ─────────────────────────────────────────────────────────────────
 
 const s: Record<string, React.CSSProperties> = {
-  page:            { minHeight: "100vh", maxWidth: "640px", margin: "0 auto", padding: "0 24px 80px", display: "flex", flexDirection: "column", background: "#0a0a0a" },
-  header:          { display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "32px", paddingBottom: "40px" },
-  wordmark:        { fontSize: "11px", letterSpacing: "0.22em", color: "#00ff88", fontFamily: "'Share Tech Mono',monospace", fontWeight: 600 },
-  ghostLink:       { fontSize: "11px", color: "#606060", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.08em" },
-  scarcityBadge:   { fontSize: "10px", letterSpacing: "0.12em", color: "#00e5ff", fontFamily: "'Share Tech Mono',monospace", padding: "4px 10px", border: "1px solid #1a2a2a", borderRadius: "2px", background: "#0a1214" },
-  confirmBanner:   { display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", padding: "12px 16px", border: "1px solid #1a2a1a", borderRadius: "2px", background: "#0a140a" },
-  confirmDot:      { width: "6px", height: "6px", borderRadius: "50%", background: "#00ff88", flexShrink: 0 },
-  confirmText:     { fontSize: "12px", color: "#00ff88", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.06em", flex: 1 },
-  txLink:          { fontSize: "11px", color: "#00e5ff", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.06em", flexShrink: 0 },
-  // Referral card styles
-  referralCard:    { marginBottom: "32px", padding: "20px", border: "1px solid #1a2a2a", borderRadius: "2px", background: "linear-gradient(135deg, #0a1214 0%, #0d1117 100%)" },
-  referralHeader:  { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" },
-  referralTitle:   { fontSize: "13px", fontWeight: 600, letterSpacing: "0.1em", color: "#00e5ff", fontFamily: "'Share Tech Mono',monospace", textTransform: "uppercase" as const },
-  referralBadge:   { fontSize: "10px", letterSpacing: "0.1em", color: "#00ff88", fontFamily: "'Share Tech Mono',monospace", padding: "3px 8px", border: "1px solid rgba(0,255,136,0.3)", borderRadius: "2px", background: "rgba(0,255,136,0.05)" },
-  referralDesc:    { fontSize: "12px", color: "#606060", fontFamily: "'Rajdhani',system-ui,sans-serif", marginBottom: "14px", lineHeight: 1.5 },
-  referralLinkRow: { display: "flex", gap: "8px", marginBottom: "12px" },
-  referralInput:   { flex: 1, padding: "10px 12px", background: "#0a0a0a", border: "1px solid #1a2a1a", borderRadius: "2px", color: "#808080", fontSize: "12px", fontFamily: "'Share Tech Mono',monospace", outline: "none" },
-  copyBtn:         { padding: "10px 16px", background: "#00e5ff", color: "#0a0a0a", border: "none", borderRadius: "2px", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, cursor: "pointer", fontFamily: "'Share Tech Mono',monospace", minWidth: "80px" },
-  shareButtons:    { display: "flex", gap: "8px" },
-  shareBtn:        { padding: "8px 14px", background: "transparent", color: "#606060", border: "1px solid #1a2a1a", borderRadius: "2px", fontSize: "11px", fontWeight: 600, letterSpacing: "0.06em", cursor: "pointer", fontFamily: "'Share Tech Mono',monospace", transition: "all 0.2s ease" },
-  stageRow:        { marginBottom: "32px" },
-  stageLabel:      { fontSize: "13px", color: "#606060", fontFamily: "'Share Tech Mono',monospace" },
-  chatWrap:        { display: "flex", flexDirection: "column", gap: "12px", marginBottom: "48px" },
-  chatLog:         { minHeight: "180px", display: "flex", flexDirection: "column", gap: "10px", padding: "20px", border: "1px solid #1a2a1a", borderRadius: "2px", background: "#0d1117" },
-  chatPlaceholder: { fontSize: "13px", color: "#3a3a3a", fontFamily: "'Share Tech Mono',monospace", lineHeight: 1.6 },
-  bubble:          { maxWidth: "80%", padding: "10px 14px", borderRadius: "2px", fontSize: "13px", fontFamily: "'Rajdhani',system-ui,sans-serif", lineHeight: 1.6, whiteSpace: "pre-wrap" as const },
-  bubbleUser:      { alignSelf: "flex-end", background: "#1a1a1a", color: "#c0c0c0" },
-  bubbleNova:      { alignSelf: "flex-start", background: "#0d1a12", color: "#00ff88", border: "1px solid #1a2a1a" },
-  chipWrap:        { display: "flex", flexWrap: "wrap" as const, gap: "8px", padding: "8px 0" },
-  chip:            { padding: "8px 16px", background: "#0d1117", border: "1px solid #1a2a2a", borderRadius: "2px", color: "#c0c0c0", fontSize: "12px", fontFamily: "'Share Tech Mono',monospace", cursor: "pointer", transition: "all 0.15s ease" },
-  chipGhost:       { borderStyle: "dashed" as const, color: "#606060" },
-  chipSelected:    { background: "#0a1a1a", borderColor: "#00e5ff", color: "#00e5ff" },
-  submitVibesBtn:  { marginTop: "8px", padding: "10px 20px", background: "#00e5ff", color: "#0a0a0a", border: "none", borderRadius: "2px", fontSize: "12px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, cursor: "pointer", fontFamily: "'Share Tech Mono',monospace" },
-  inputRow:        { display: "flex", gap: "8px" },
-  chatInput:       { flex: 1, padding: "12px 14px", background: "#0d1117", border: "1px solid #1a2a1a", borderRadius: "2px", color: "#c0c0c0", fontSize: "14px", fontFamily: "'Share Tech Mono',monospace", outline: "none" },
-  sendBtn:         { padding: "12px 20px", background: "#00e5ff", color: "#0a0a0a", border: "none", borderRadius: "2px", fontSize: "12px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, cursor: "pointer", fontFamily: "'Share Tech Mono',monospace" },
-  errNote:         { fontSize: "12px", color: "#ef4444", fontFamily: "'Share Tech Mono',monospace" },
-  footer:          { marginTop: "auto", paddingTop: "32px" },
-  dim:             { fontSize: "11px", color: "#2a2a2a", fontFamily: "'Share Tech Mono',monospace" },
+  page: {
+    minHeight: "100vh", maxWidth: "720px", margin: "0 auto",
+    padding: "0 24px 80px", display: "flex", flexDirection: "column",
+    background: "#0a0a0a", position: "relative", overflow: "hidden",
+  },
+  scanlines: {
+    position: "fixed", inset: 0, pointerEvents: "none",
+    background: "repeating-linear-gradient(to bottom, transparent 0, transparent 3px, rgba(255,255,255,0.012) 3px, rgba(255,255,255,0.012) 4px)",
+    zIndex: 1,
+  },
+  header: {
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    paddingTop: "32px", paddingBottom: "24px", position: "relative", zIndex: 2,
+  },
+  wordmark: { fontSize: "11px", letterSpacing: "0.22em", color: "#00ff88", fontFamily: "'Share Tech Mono',monospace", fontWeight: 600 },
+  ghostLink: { fontSize: "11px", color: "#606060", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.08em", textDecoration: "none" },
+  scarcityBadge: { fontSize: "10px", letterSpacing: "0.12em", color: "#00e5ff", fontFamily: "'Share Tech Mono',monospace", padding: "4px 10px", border: "1px solid #1a2a2a", borderRadius: "2px", background: "#0a1214" },
+
+  confirmBanner: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", padding: "10px 14px", border: "1px solid #1a2a1a", borderRadius: "2px", background: "#0a140a", position: "relative", zIndex: 2 },
+  confirmDot: { width: "6px", height: "6px", borderRadius: "50%", background: "#00ff88", flexShrink: 0, boxShadow: "0 0 6px #00ff88" },
+  confirmText: { fontSize: "11px", color: "#00ff88", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.06em", flex: 1 },
+  txLink: { fontSize: "10px", color: "#00e5ff", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.06em", flexShrink: 0, textDecoration: "none" },
+
+  loadingBox: { display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "48px 24px", border: "1px solid #1a2a2a", borderRadius: "2px", background: "#0d1117", position: "relative", zIndex: 2 },
+  loadingPulse: { width: "10px", height: "10px", borderRadius: "50%", background: "#00e5ff", boxShadow: "0 0 16px #00e5ff", animation: "nova-glow-pulse 1.4s ease-in-out infinite" },
+  loadingText: { fontSize: "13px", color: "#00e5ff", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.08em", margin: 0 },
+  dimSmall: { fontSize: "11px", color: "#606060", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.04em", margin: 0 },
+
+  chatPanel: {
+    display: "flex", flexDirection: "column", border: "1px solid #1a2a2a",
+    borderRadius: "4px", background: "#0d1117", overflow: "hidden",
+    position: "relative", zIndex: 2,
+    boxShadow: "0 0 24px rgba(0, 229, 255, 0.04), inset 0 0 0 1px rgba(0, 229, 255, 0.04)",
+  },
+  chatTermBar: {
+    display: "flex", alignItems: "center", gap: "10px",
+    padding: "10px 16px", background: "#0a1214",
+    borderBottom: "1px solid #1a2a2a",
+  },
+  chatTermDot: { width: "8px", height: "8px", borderRadius: "50%", background: "#00ff88", boxShadow: "0 0 6px #00ff88" },
+  chatTermPrompt: { fontSize: "11px", color: "#00e5ff", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.08em", flex: 1 },
+  chatTermStatus: { fontSize: "10px", color: "#606060", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.08em" },
+
+  chatLog: {
+    minHeight: "320px", maxHeight: "60vh", overflowY: "auto",
+    padding: "20px", display: "flex", flexDirection: "column", gap: "12px",
+  },
+  bubble: {
+    maxWidth: "88%", padding: "10px 14px", borderRadius: "4px",
+    fontSize: "14px", fontFamily: "'Rajdhani',system-ui,sans-serif",
+    lineHeight: 1.55, whiteSpace: "pre-wrap" as const, wordBreak: "break-word" as const,
+  },
+  bubbleUser: { alignSelf: "flex-end", background: "#161616", color: "#c0c0c0", border: "1px solid #1f1f1f" },
+  bubbleNova: { alignSelf: "flex-start", background: "#0a1a12", color: "#d6ffe9", border: "1px solid rgba(0, 255, 136, 0.25)" },
+
+  inputRow: {
+    display: "flex", alignItems: "center", gap: "8px",
+    padding: "12px 16px", borderTop: "1px solid #1a2a2a", background: "#0a1214",
+  },
+  inputPrompt: { color: "#00ff88", fontFamily: "'Share Tech Mono',monospace", fontSize: "16px", paddingLeft: "2px" },
+  input: {
+    flex: 1, padding: "10px 12px", background: "transparent",
+    border: "none", outline: "none", color: "#e0e0e0",
+    fontSize: "14px", fontFamily: "'Share Tech Mono',monospace",
+    letterSpacing: "0.02em",
+  },
+  sendBtn: {
+    padding: "8px 18px", background: "#00e5ff", color: "#0a0a0a",
+    border: "none", borderRadius: "2px", fontSize: "11px", fontWeight: 700,
+    letterSpacing: "0.1em", textTransform: "uppercase" as const,
+    cursor: "pointer", fontFamily: "'Share Tech Mono',monospace",
+    transition: "all 150ms ease",
+  },
+  sendBtnDisabled: { background: "#1a2a2a", color: "#506060", cursor: "not-allowed" },
+
+  errNote: { fontSize: "12px", color: "#ef4444", fontFamily: "'Share Tech Mono',monospace", padding: "10px 16px", borderTop: "1px solid #2a1a1a", background: "#140a0a" },
+
+  footer: { marginTop: "auto", paddingTop: "32px", display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" as const, position: "relative", zIndex: 2 },
+  dim: { fontSize: "10px", color: "#404040", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.06em" },
 };
