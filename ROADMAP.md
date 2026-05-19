@@ -57,12 +57,28 @@ Estados: `[ ]` pending · `[~]` in progress · `[x]` done · `[s]` skipped (con 
 - [ ] Documentar deploy en `DEPLOYMENTS.md` — pendiente Fase 1.E
 
 ### 1.E — Audit interno + deploy Mainnet 🎯 **NEXT UP**
-- [ ] Deploy en Base Sepolia
+- [x] Deploy script `deploy-zylogenjob-sepolia.js` listo + documentado — PR #12 (2026-05-18)
+- [ ] **Wichi corre el deploy en Sepolia** (necesita EOA con ≥0.005 ETH)
 - [ ] Audit interno con checklist OpenZeppelin
 - [ ] `slither` / `mythril` clean
 - [ ] Deploy en Base Mainnet
 - [ ] SDK V3 mínima apuntando al kernel mainnet
 - [ ] Publicar como `@zylogen/sdk` en npm (verificar disponibilidad del scope)
+
+---
+
+## Fase Nova — Product pivot (paralelo a Fase 1)
+
+**Objetivo:** Nova entrega algo que podemos sostener. Drop del brand-kit; queda chat 1:1 con Claude Sonnet, gated por escrow.
+
+- [x] Backend: `chatWithNova(email, message, history)` stateless en `novaBrain.js` — PR #13
+- [x] Frontend: dashboard reescrito como chat puro con FX cyberpunk — PR #13
+- [x] Landing copy actualizado ("Your founder's thinking partner") — PR #13
+- [x] Settle inmediato al lock (fix de USDC stranded) — PR #14
+- [ ] **Recrear webhook Stripe en sandbox** apuntando a Railway prod (blocker actual: lista vacía)
+- [ ] Verificación end-to-end real con tarjeta test `4242 4242 4242 4242`
+- [ ] Cron / retry para escrows con `status='locked'` que settle falló
+- [ ] Cleanup de dead code era brand-kit (`kitGenerator.js`, `sendKitDeliveredEmail`, columna `branding_kit`, ruta admin) — ~150 LOC
 
 ---
 

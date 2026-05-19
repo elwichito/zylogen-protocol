@@ -139,6 +139,48 @@ Ninguno.
 
 ---
 
+## 2026-05-18 — Fase 1.E script + Nova product pivot
+
+**Operator:** Wichi · **Asistente:** Zyl (Claude Code)
+
+### Qué se hizo
+
+Tres PRs mergeados, todos sobre `main` con CI verde:
+
+- **PR #12 — Fase 1.E sepolia deploy script.** `contracts/scripts/deploy-zylogenjob-sepolia.js` (130 LOC), guía paso-a-paso en `contracts/scripts/README.md`. Agrega `KERNEL_PAUSER_ADDRESS` y `KERNEL_FORWARDER` a `contracts/.env.example`. Whitelist de `.env.example` en `.gitignore` (antes el patrón `.env.*` los descartaba). El comando final que Wichi corre cuando tenga la EOA fondeada: `cd contracts && npx hardhat run scripts/deploy-zylogenjob-sepolia.js --network baseSepolia`.
+
+- **PR #13 — Pivot de producto Nova.** Drop del brand-kit (visual system + content strategy + voice guide) que prometíamos y no podíamos entregar. Nuevo deliverable: 1:1 chat con Claude Sonnet, gated por el escrow de $9.99. Backend: nueva función `chatWithNova(email, message, history)` stateless con system prompt bilingüe ES/EN. Frontend: dashboard reescrito como panel de chat puro con FX cyberpunk (terminal bar `nova@zylogen:~`, burbujas de Nova con glow verde pulsante, typing dots animados, scanlines, fade-in, auto-scroll, auto-focus). Landing copy actualizado: "Your founder's thinking partner".
+
+- **PR #14 — Fix de settlement.** PR #13 dejó un agujero: removió el único call site de `releasePayment`. Cada pago futuro habría dejado 9 USDC stranded en el escrow. Fix: llamar a `releasePayment(taskId, email)` inmediatamente después de que `lock()` confirma, dentro de `relayPaymentToEscrow`. Best-effort (try/catch): si settle falla, lock ya se hizo, el chat unlock sigue funcionando, escrow queda `status='locked'` para un retry futuro.
+
+### Pendientes al cierre
+
+- **Webhook Stripe ausente.** Stripe sandbox no tiene ningún webhook endpoint registrado (la lista está vacía). Probablemente alguien lo borró desde la sandbox UI o Stripe lo limpió. Hasta que se recree apuntando a `https://zylogen-protocol-production.up.railway.app/webhooks/stripe`, ningún pago real triggea Railway → ningún cliente nuevo puede chatear.
+- **Cron de retry para escrows stuck.** PR #14 deja `status='locked'` cuando settle falla; nada lo retoma automáticamente. Manual hoy.
+- **Verificación end-to-end real.** Intenté disparar un webhook firmado contra Railway pero el container rechazaba la firma (mismo bug de "stale env" que vimos en sesiones anteriores), incluso después de redeploy fresco. La causa raíz requiere más diagnóstico; el código del chat en sí está sano (CI verde, lógica revisada). Verificación quedó parcial.
+- **Cleanup de dead code de la era brand-kit.** ~150 LOC en `kitGenerator.js`, `sendKitDeliveredEmail`, columna `branding_kit`, ruta admin. Sigue en disco para no romper el panel admin que muestra kits históricos.
+- **Fase 1.E real deploy.** Script listo, falta que Wichi corra el comando con su EOA fondeada en Sepolia.
+
+### Blockers
+
+- **Webhook Stripe borrado.** Bloquea adquisición de nuevos clientes vía pago Stripe. Para reabrir: `stripe webhook_endpoints create --url https://zylogen-protocol-production.up.railway.app/webhooks/stripe --enabled-events checkout.session.completed` y después `railway variables --set STRIPE_WEBHOOK_SECRET=whsec_xxx` con el secret nuevo.
+- **Firma de webhook rechazada por Railway prod.** Container parece tener un secret stale. Workaround conocido (de sesiones previas): set la env var dos veces consecutivas, segunda vez fuerza redeploy con la nueva. No probé este workaround hoy.
+
+### Commits / PRs
+
+- PR #12 → mergeado (squash) — Fase 1.E deploy script
+- PR #13 → mergeado (squash) — Nova chat pivot
+- PR #14 → mergeado (squash) — settle on lock
+- Commit directo a `main` (`[ses-2026-05-18] close`) — este housekeeping
+
+### Decisiones
+
+- **El chat es el deliverable.** Pivote explícito desde "brand kit promised in 24h" a "chat directo right now". El precio sigue siendo $9.99 USDC en escrow on Base.
+- **Settle inmediato al lock.** No hay milestone de fulfilment separado; value se entrega al unlockear la sesión.
+- **No tocar el código admin / kitGenerator todavía.** Para no romper el dashboard interno que muestra órdenes históricas. Cleanup en sesión separada.
+
+---
+
 <!--
 Plantilla para nuevas entradas:
 
