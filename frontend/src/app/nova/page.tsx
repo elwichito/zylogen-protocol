@@ -10,6 +10,10 @@ import ScarcityCounter from "../../components/ScarcityCounter";
 type Step = 0 | 1 | 2;
 type PayState = "idle" | "loading" | "redirecting" | "cancelled" | "sold_out";
 type CryptoState = "idle" | "approving" | "locking" | "confirming" | "done" | "error";
+type Tier = "founding" | "regular" | null;
+
+const FOUNDING_PRICE = "$9.99";
+const REGULAR_PRICE  = "$29.99";
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
 const REFERRAL_STORAGE_KEY = "zyl_referral_code";
@@ -41,6 +45,17 @@ export default function NovaPage() {
   const [lockTxHash,   setLockTxHash]   = useState<`0x${string}` | undefined>();
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [referralValid, setReferralValid] = useState<boolean | null>(null);
+  const [tier, setTier]                 = useState<Tier>(null);
+
+  // Probe scarcity once on mount so the price displayed matches the price
+  // the backend will charge. ScarcityCounter polls separately for the live
+  // counter; this is just for the tier decision.
+  useEffect(() => {
+    fetch(`${BACKEND}/api/nova/scarcity`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setTier(d.remaining > 0 ? "founding" : "regular"))
+      .catch(() => setTier("regular")); // fail-safe: assume regular price
+  }, []);
 
   // ─── Auto-advance when wallet connects ──────────────────────────────────
   useEffect(() => {
@@ -134,13 +149,13 @@ export default function NovaPage() {
     setStep(2);
   }, [email]);
 
-  // ─── Step 03a: Stripe checkout (fiat) ──────────────────────────────────
+  // ─── Step 03a: Stripe subscription checkout (fiat) ─────────────────────
   const handleStripeCheckout = useCallback(async () => {
     if (!address) return;
     setErrorMsg(null);
     setPayState("loading");
     try {
-      const res = await fetch(`${BACKEND}/api/nova/checkout`, {
+      const res = await fetch(`${BACKEND}/api/nova/subscribe`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ walletAddress: address, email }),
@@ -148,7 +163,7 @@ export default function NovaPage() {
       const data = await res.json();
       if (!res.ok) {
         if (data.error === "sold_out") { setPayState("sold_out"); return; }
-        throw new Error(data.error ?? "Checkout failed.");
+        throw new Error(data.error ?? "Subscribe failed.");
       }
       setPayState("redirecting");
       window.location.href = data.checkoutUrl;
@@ -220,22 +235,22 @@ export default function NovaPage() {
   }, [address, chainId, switchChain, approveUsdc, lockEscrow]);
 
   // ─── Derived state ────────────────────────────────────────────────────
-  const stripeDisabled = payState === "loading" || payState === "redirecting" || payState === "sold_out" || cryptoState !== "idle";
-  const cryptoDisabled = cryptoState !== "idle" && cryptoState !== "error";
-  const anyPayBusy = stripeDisabled || cryptoDisabled;
+  const displayPrice = tier === "regular" ? REGULAR_PRICE : FOUNDING_PRICE;
+
+  const stripeDisabled = payState === "loading" || payState === "redirecting" || payState === "sold_out";
+
+  // Crypto monthly path lands in PR 7; the legacy one-time flow doesn't
+  // satisfy the new subscription gate, so we disable it here rather than
+  // silently leaving users with locked USDC and no chat access.
+  const cryptoDisabled = true;
 
   const stripeLabel =
     payState === "loading"      ? "Preparing checkout…"
     : payState === "redirecting"  ? "Redirecting to Stripe…"
     : payState === "sold_out"     ? "Sold Out"
-    : "Pay with Card — $9.99";
+    : `Subscribe — ${displayPrice}/mo`;
 
-  const cryptoLabel =
-    cryptoState === "approving"   ? "Approving USDC…"
-    : cryptoState === "locking"     ? "Locking funds…"
-    : cryptoState === "confirming"  ? "Confirming on Base…"
-    : cryptoState === "done"        ? "✓ Payment confirmed"
-    : "Pay with USDC — $9.99";
+  const cryptoLabel = "Pay with USDC — coming soon";
 
   return (
     <main style={s.page}>
@@ -259,7 +274,7 @@ export default function NovaPage() {
         <p style={s.subline}>
           A direct chat with Nova — your AI consultant for naming, copy,
           go-to-market, and the hard product decisions a solo founder makes
-          alone. Pay once, talk as long as you need.
+          alone. {FOUNDING_PRICE}/month for the first 100 members.
         </p>
         {/* Referral badge */}
         {referralValid && (
@@ -316,14 +331,24 @@ export default function NovaPage() {
 
         <div style={s.divider} />
 
-        {/* Step 03 — Pay */}
-        <StepRow num="03" title="Founding 100 — $9.99" isActive={step === 2} isComplete={cryptoState === "done"} isLocked={step < 2}>
+        {/* Step 03 — Subscribe */}
+        <StepRow
+          num="03"
+          title={tier === "regular" ? `Subscribe — ${REGULAR_PRICE}/mo` : `Founding 100 — ${FOUNDING_PRICE}/mo`}
+          isActive={step === 2}
+          isComplete={cryptoState === "done"}
+          isLocked={step < 2}
+        >
           {step === 2 && (
             <>
               <div style={s.priceRow}>
-                <span style={s.price}>$9.99</span>
-                <span style={s.priceSub}>one-time · Founding 100 rate</span>
-                <span style={s.priceBadge}>LOCKED IN FOREVER</span>
+                <span style={s.price}>{displayPrice}</span>
+                <span style={s.priceSub}>
+                  per month · {tier === "regular" ? "regular rate" : "founding rate"}
+                </span>
+                <span style={s.priceBadge}>
+                  {tier === "regular" ? "STANDARD" : "LOCKED WHILE ACTIVE"}
+                </span>
               </div>
 
               {/* Native USDC button (primary) */}
@@ -365,10 +390,12 @@ export default function NovaPage() {
               </button>
 
               {payState === "cancelled" && (
-                <p style={{ ...s.hint, color: "#f59e0b" }}>Payment cancelled — your spot is still open.</p>
+                <p style={{ ...s.hint, color: "#f59e0b" }}>Subscription cancelled — your spot is still open.</p>
               )}
               {errorMsg && <p style={s.errNote}>{errorMsg}</p>}
-              <p style={s.secNote}>Escrow-protected · Funds release only on delivery</p>
+              <p style={s.secNote}>
+                Stripe-managed billing · Cancel anytime · Founding rate held while subscription stays active
+              </p>
             </>
           )}
           {step < 2 && <p style={s.lockedNote}>Complete steps above to unlock</p>}
@@ -379,10 +406,11 @@ export default function NovaPage() {
       {/* ── Features ── */}
       <section style={s.features}>
         {[
-          ["Direct chat",      "1:1 conversation. No tickets, no queue, no agency middleman."],
-          ["Founder context",  "Trained for solo founders on Base — no-budget, no-team realities."],
-          ["Strategy on tap",  "Naming, positioning, copy, GTM, hard product calls — ask anything."],
-          ["Escrowed payment", "USDC locked on Base. You get value before the funds settle."],
+          ["1:1 chat",          "Direct conversation. No tickets, no queue, no agency middleman."],
+          ["Founder context",   "Trained for solo founders on Base — no-budget, no-team realities."],
+          ["Strategy on tap",   "Naming, positioning, copy, GTM, hard product calls — ask anything."],
+          ["Founding rate",     "First 100 lock $9.99/mo. After that, the rate moves to $29.99/mo."],
+          ["Cancel anytime",    "Managed via Stripe. Stop the moment Nova stops being useful."],
         ].map(([t, d]) => (
           <div key={t} style={s.featureItem}>
             <span style={s.featureTitle}>{t}</span>
