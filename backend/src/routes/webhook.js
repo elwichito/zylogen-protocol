@@ -1,7 +1,7 @@
 "use strict";
 
 const express = require("express");
-const { handleStripeWebhook, rawBodyMiddleware } = require("../services/paymentRelay");
+const { handleStripeWebhook, rawBodyMiddleware } = require("../services/stripeWebhook");
 
 const router = express.Router();
 
