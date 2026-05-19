@@ -189,6 +189,34 @@ async function relayPaymentToEscrow(clientAddress, customerEmail, stripeSessionI
   invalidateZylScoreCache();
 
   log.info({ taskId, email: customerEmail, txHash: receipt.hash }, "Task locked on-chain");
+
+  // 7. Settle immediately. Since the simplified Nova product treats the
+  //    chat itself as the deliverable, value is delivered the moment the
+  //    customer unlocks their session — there's no separate fulfilment
+  //    step to wait for. Settling here releases the relayer's locked USDC
+  //    (worker portion to relayer, fees to treasury / burn) without
+  //    leaving funds stranded.
+  //
+  //    Best-effort: if settle fails (network blip, gas spike, oracle key
+  //    issue), we still return success to Stripe so the webhook isn't
+  //    retried. The escrow stays `status='locked'` in SQLite and a
+  //    follow-up retry job can settle it later. Customer's chat unlock
+  //    is unaffected either way.
+  try {
+    const settleRes = await releasePayment(taskId, customerEmail);
+    log.info(
+      { taskId, email: customerEmail, settleTxHash: settleRes.txHash ?? null, skippedOnChain: settleRes.skippedOnChain ?? false },
+      "Task settled immediately after lock (Nova chat is the deliverable)"
+    );
+  } catch (err) {
+    // Don't propagate — lock already succeeded, customer's chat will still
+    // unlock. Leave status='locked' so a retry path can settle later.
+    log.warn(
+      { err: err.message, taskId, email: customerEmail },
+      "Immediate settle failed; escrow remains locked, manual / cron retry needed"
+    );
+  }
+
   return { taskId, txHash: receipt.hash };
 }
 
