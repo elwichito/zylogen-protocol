@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import Providers from "./providers";
 
 export const metadata: Metadata = {
-  title: "Nova — Elite Business AI Worker on Base",
+  title: "Nova — Your founder's thinking partner | Zylogen",
   description:
-    "A complete Instagram identity system — brand voice, visual language, 30-day content strategy — delivered by an AI consultant. Founding 100 spots only.",
+    "1:1 AI consultant for solo founders on Base. Naming, copy, GTM, hard product calls — $9.99/month. First 100 founding members lock the price forever.",
   openGraph: {
-    title: "Nova: Elite Business AI Worker on Base",
+    title: "Nova — Your founder's thinking partner",
     description:
-      "Your brand, architected. A complete Instagram branding kit delivered by Nova AI. Founding 100 spots — settle on-chain, invisible to you.",
+      "Direct chat with an AI consultant trained for solo founders on Base. $9.99/month. Founding 100 lock the price forever.",
     url: "https://zylogen.xyz/nova",
     siteName: "Zylogen Protocol",
     type: "website",
@@ -16,9 +16,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Nova: Elite Business AI Worker on Base",
+    title: "Nova — Your founder's thinking partner",
     description:
-      "Your brand, architected. A complete Instagram branding kit delivered by Nova AI. Founding 100 spots.",
+      "Direct chat with an AI consultant for solo founders on Base. $9.99/month. Founding 100 lock the price forever.",
   },
   metadataBase: new URL("https://zylogen.xyz"),
 };

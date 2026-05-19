@@ -5,6 +5,11 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_PRIVY_APP_ID: process.env.NEXT_PUBLIC_PRIVY_APP_ID || "",
     NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001",
   },
+  async redirects() {
+    return [
+      { source: "/", destination: "/nova", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;
