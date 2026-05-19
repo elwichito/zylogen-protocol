@@ -120,6 +120,75 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_referrals_referrer
     ON referrals (referrer_email);
+
+  -- ─── Subscription model (Fase Nova 2) ─────────────────────────────────────
+  -- One row per subscription lifecycle. A wallet can have multiple rows over
+  -- time (one active + history of canceled). At any moment, at most one row
+  -- per wallet has status='active' — enforced by a partial unique index below.
+  CREATE TABLE IF NOT EXISTS subscriptions (
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    wallet                 TEXT    NOT NULL,
+    email                  TEXT,
+    source                 TEXT    NOT NULL CHECK (source IN ('stripe', 'crypto')),
+    stripe_subscription_id TEXT    UNIQUE,
+    stripe_customer_id     TEXT,
+    status                 TEXT    NOT NULL DEFAULT 'incomplete'
+                                   CHECK (status IN ('active','past_due','canceled','incomplete')),
+    -- founding_member = 1 means this subscription was locked at the $9.99/mo
+    -- founding rate. Stays 1 for the lifetime of THIS row; if the wallet
+    -- cancels and re-subscribes, the new row starts with founding_member = 0.
+    founding_member        INTEGER NOT NULL DEFAULT 0,
+    current_period_start   DATETIME,
+    current_period_end     DATETIME,
+    canceled_at            DATETIME,
+    created_at             DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at             DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_subscriptions_wallet_active
+    ON subscriptions(wallet) WHERE status = 'active';
+  CREATE INDEX IF NOT EXISTS idx_subscriptions_wallet
+    ON subscriptions(wallet);
+  CREATE INDEX IF NOT EXISTS idx_subscriptions_period_end
+    ON subscriptions(current_period_end) WHERE status = 'active';
+
+  -- ─── Persistent chat history (scoped by wallet) ───────────────────────────
+  CREATE TABLE IF NOT EXISTS nova_messages (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    wallet      TEXT    NOT NULL,
+    role        TEXT    NOT NULL CHECK (role IN ('user','nova')),
+    text        TEXT    NOT NULL,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_nova_messages_wallet_time
+    ON nova_messages(wallet, created_at);
+
+  -- ─── Wallet-signature auth (SIWE-lite) ────────────────────────────────────
+  -- Nonces: single-use, short-lived (5 min). Consumed during /verify.
+  CREATE TABLE IF NOT EXISTS auth_nonces (
+    nonce       TEXT    PRIMARY KEY,
+    wallet      TEXT    NOT NULL,
+    expires_at  DATETIME NOT NULL,
+    used        INTEGER NOT NULL DEFAULT 0,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_auth_nonces_expires
+    ON auth_nonces(expires_at);
+
+  -- Sessions: cookie-backed, 30-day TTL. We store the SHA-256 of the cookie
+  -- value, never the raw token — so a DB leak doesn't compromise live sessions.
+  CREATE TABLE IF NOT EXISTS auth_sessions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash  TEXT    NOT NULL UNIQUE,
+    wallet      TEXT    NOT NULL,
+    expires_at  DATETIME NOT NULL,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_auth_sessions_wallet
+    ON auth_sessions(wallet);
+  CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires
+    ON auth_sessions(expires_at);
 `);
 
 // Column migrations for nova_sessions table - add referral columns
