@@ -181,6 +181,64 @@ Tres PRs mergeados, todos sobre `main` con CI verde:
 
 ---
 
+## 2026-05-19 → 2026-05-20 — Fase Nova 2 (pivot a suscripción mensual)
+
+**Operator:** Wichi · **Asistente:** Zyl (Claude Code)
+
+### Decisión grande de la sesión
+
+Pivote del modelo de pago: de **one-time $9.99 con escrow** a **suscripción mensual $9.99/mo (founding 100) → $29.99/mo (resto)**. La wallet pasa a ser la identidad real del producto (no más email-trust desde URL). Cancel = se pierde el founding rate. Fallo de cobro = acceso cortado inmediatamente, sin grace period.
+
+### Qué se hizo
+
+**PR #15** (rama `fase-nova-2-subscription-pivot`, 7 commits, ready-for-review):
+
+1. **Meta tags + `/` → `/nova` redirect** (91d4f63). Drop del copy brand-kit en tabs/Google/Twitter previews. Root deja de 404.
+2. **DB schema** (6b6d984). 5 tablas nuevas: `subscriptions` (partial unique index para enforcing 1 active por wallet), `nova_messages` (chat persistido), `auth_nonces`, `auth_sessions` (cookie hashed), `crypto_payments` (UNIQUE tx_hash).
+3. **Wallet auth (SIWE-lite)** (8e72fe6). `/api/auth/nonce` + `/verify` + `/logout` + `/me`. Cookie HttpOnly 30d. `scripts/test-auth.js` — 14/14 assertions de isolation pass (cross-wallet forge, replay, tampered sig, session leak).
+4. **Stripe subscriptions** (f824ac6). `scripts/setup-stripe-products.js` (idempotente), `services/subscriptions.js` (DB + atomic founding slot claim), `services/stripeWebhook.js` (4 eventos), nuevas rutas `/subscribe`, `/billing-portal`, `/subscription/status`, `/history`, `/message` ahora authed + gated por `hasActiveAccess(wallet)`.
+5. **Dashboard rewrite** (43fb479). Login card (Connect → Sign → cookie), chat hidratado desde `/api/nova/history`, "Manage" → Stripe Billing Portal, "Sign out", FOUNDING badge, próxima fecha de renew. Wallet-mismatch warning como diagnóstico.
+6. **Landing copy** (4778c75). Probe de `/scarcity` para mostrar precio correcto antes del click ($9.99 vs $29.99). Botón Stripe usa `/subscribe`. Crypto button deshabilitado temporal (legacy escrow no satisfacía nuevo gate).
+7. **Crypto monthly** (5234d5b). `USDC.transfer(treasury, $9.99)` → `/api/nova/crypto-verify` → backend lee receipt vía JsonRpcProvider, parsea Transfer event, idempotente vía UNIQUE(tx_hash), extiende `current_period_end` 30 días. Renewals stackean desde `max(now, current_period_end)`.
+
+Subtarea paralela: agente spawneado migró `layout.tsx` a `next/font/google` (zero-CLS, self-hosted). Bundled en commit 4778c75.
+
+### Pendientes al cierre
+
+Todos operator-side (Wichi-holds-keys):
+
+- Correr `node backend/scripts/setup-stripe-products.js` y pegar los IDs (`STRIPE_PRICE_FOUNDING`, `STRIPE_PRICE_REGULAR`) en Railway env
+- Recrear webhook Stripe → 4 eventos (`checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`), copiar `whsec_` a Railway
+- Setear `NOVA_TREASURY_ADDRESS` en Railway (fallback actual = `NOVA_WORKER_ADDRESS`, funciona pero mezcla flujos)
+- Verificación end-to-end real: tarjeta test `4242 4242 4242 4242` + tx USDC test
+- Merge PR #15 → main
+
+Polish que quedó para siguientes sesiones:
+- Botón "Renew with USDC" dedicado en dashboard (hoy el landing flow funciona como renew vía idempotencia del `/crypto-verify`)
+- Migrar endpoints legacy email-as-identity (`/status`, `/verify-payment`, `/referral/*`, `/my-referrals`, `/apply-referral`)
+- Cleanup brand-kit dead code (sigue pendiente desde sesión anterior)
+
+### Blockers
+
+Ninguno desbloqueable por Zyl. Toda la implementación buildea limpia (tsc + `npm run build`) y los tests de isolation pasan.
+
+### Commits / PRs
+
+- PR [#15](https://github.com/elwichito/zylogen-protocol/pull/15) → **ready for review**, 7 commits, +1900/−400 LOC aprox
+- Branch: `fase-nova-2-subscription-pivot`
+- Spawned task lateral: migración `next/font` (mergeada al PR 6 commit)
+
+### Decisiones
+
+- **Wallet = identidad real**, email como label. La wallet ya estaba en `client_reference_id` de Stripe y firma `lock()` on-chain; reusarla evita duplicar identidad.
+- **Founding rate locked while active**, no "forever". Si cancelan, re-subscribe paga $29.99. Defensible legal + reputacionalmente.
+- **Sin grace period en fallos de pago**: corte inmediato. Stripe dunning emails siguen corriendo gratis para reactivación.
+- **Crypto recurring = manual mensual** (descartado allowance-pull por complejidad). El landing button doubles as renew vía idempotencia.
+- **Stripe Customer Portal hosteado** en lugar de UI propia de billing. Cero código mantenido.
+- **PR único de 7 commits** (no 7 PRs separados). Cada commit es mergeable solo y el orden está documentado en el PR body.
+
+---
+
 <!--
 Plantilla para nuevas entradas:
 

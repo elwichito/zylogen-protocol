@@ -80,6 +80,24 @@ Estados: `[ ]` pending · `[~]` in progress · `[x]` done · `[s]` skipped (con 
 - [ ] Cron / retry para escrows con `status='locked'` que settle falló
 - [ ] Cleanup de dead code era brand-kit (`kitGenerator.js`, `sendKitDeliveredEmail`, columna `branding_kit`, ruta admin) — ~150 LOC
 
+### Fase Nova 2 — Pivot a suscripción mensual (PR #15)
+
+**Objetivo:** Modelo sostenible (recurring $9.99/mo founding 100 → $29.99/mo) + autenticación real por wallet + chat persistido. Identidad = wallet (la misma que pagó), email queda como label.
+
+- [x] Meta tags + `/` → `/nova` redirect — commit 91d4f63
+- [x] DB schema: `subscriptions`, `nova_messages`, `auth_nonces`, `auth_sessions`, `crypto_payments` — commit 6b6d984
+- [x] Wallet-signature auth (SIWE-lite) — services + middleware + endpoints + 14/14 isolation test pass — commit 8e72fe6
+- [x] Stripe subscription product setup script + webhook handler (subscription events) + nuevas rutas gateadas — commit f824ac6
+- [x] Frontend login card + dashboard hidrata chat desde DB + manage button → Stripe Billing Portal — commit 43fb479
+- [x] Landing copy + meta para modelo mensual (founding $9.99 vs regular $29.99) — commit 4778c75
+- [x] Cripto monthly: `USDC.transfer(treasury, $9.99)` → backend verify → +30 días, idempotente vía UNIQUE(tx_hash) — commit 5234d5b
+- [ ] **Wichi corre** `node backend/scripts/setup-stripe-products.js` para provisionar prices y pegar IDs en Railway env
+- [ ] **Wichi recrea** webhook Stripe → 4 eventos (`checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`)
+- [ ] **Wichi setea** `NOVA_TREASURY_ADDRESS` en Railway (fallback actual a `NOVA_WORKER_ADDRESS`)
+- [ ] Verificación end-to-end local con tarjeta test + USDC test
+- [ ] (Polish) Botón "Renew with USDC" en dashboard cuando `current_period_end < 7d` — hoy el flujo del landing funciona como renew idempotente
+- [ ] (Polish) Migrar endpoints legacy (`/status`, `/verify-payment`, referrals) off del email-as-identity model
+
 ---
 
 ## Fase 2 — Tres founders deployaron con Zylogen
