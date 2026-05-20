@@ -19,6 +19,7 @@ const {
   getActiveSubscription,
   hasActiveAccess,
 } = require("../services/subscriptions");
+const { verifyAndCredit: verifyCryptoPayment } = require("../services/cryptoPayments");
 const { requireWallet } = require("../middleware/auth");
 
 const router = express.Router();
@@ -139,6 +140,39 @@ router.post("/subscribe", async (req, res) => {
   } catch (err) {
     log.error({ err, wallet: walletAddress }, "Subscribe session creation failed");
     res.status(500).json({ error: "Could not create subscription session" });
+  }
+});
+
+// ─── POST /api/nova/crypto-verify ───────────────────────────────────────────
+// Open endpoint. Body: { walletAddress, txHash, email? }.
+// Verifies the on-chain USDC transfer to the treasury, then either
+// creates a new subscription (claiming a founding slot if one exists) or
+// extends the wallet's existing subscription by 30 days. Idempotent via
+// UNIQUE(tx_hash). Handles both first-time subscribe and monthly renew —
+// the only branching is "does this wallet already have a subscription?".
+
+router.post("/crypto-verify", async (req, res) => {
+  const { walletAddress, txHash, email } = req.body ?? {};
+
+  if (!walletAddress || !/^0x[0-9a-fA-F]{40}$/.test(walletAddress)) {
+    return res.status(400).json({ error: "valid walletAddress required" });
+  }
+  if (!txHash || !/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
+    return res.status(400).json({ error: "valid txHash required" });
+  }
+
+  try {
+    const result = await verifyCryptoPayment({ walletInput: walletAddress, txHash, email: email || null });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    // Map known verification failures to 4xx; everything else is 500.
+    const known = ["tx_not_found", "tx_reverted", "no_matching_transfer", "tx_already_redeemed"];
+    if (known.includes(err.code)) {
+      log.info({ wallet: walletAddress, txHash, code: err.code }, "Crypto verify rejected");
+      return res.status(400).json({ error: err.code });
+    }
+    log.error({ err, wallet: walletAddress, txHash }, "Crypto verify failed");
+    res.status(500).json({ error: "Could not verify on-chain payment" });
   }
 });
 

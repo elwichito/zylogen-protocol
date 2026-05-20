@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from "wagmi";
 import { base } from "wagmi/chains";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { parseAbi, encodePacked, keccak256 } from "viem";
+import { parseAbi } from "viem";
 import ScarcityCounter from "../../components/ScarcityCounter";
 
 type Step = 0 | 1 | 2;
@@ -19,18 +19,16 @@ const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
 const REFERRAL_STORAGE_KEY = "zyl_referral_code";
 
 // ─── Contract addresses (from env, with mainnet defaults) ───────────────────
-const TASK_ESCROW = (process.env.NEXT_PUBLIC_TASK_ESCROW_ADDRESS ?? "0xBE464859Fb6f09fa93b6212f616F3AD19ebe48B1") as `0x${string}`;
-const USDC_BASE   = (process.env.NEXT_PUBLIC_USDC_ADDRESS ?? "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913") as `0x${string}`;
-const NOVA_WORKER = (process.env.NEXT_PUBLIC_NOVA_WORKER_ADDRESS ?? "0x9e80b1aa9c7C2a8B875CC569D8E30cEfB364c9aD") as `0x${string}`;
-const LOCK_AMOUNT = BigInt(9_000_000); // $9.00 USDC (6 decimals)
-const DEADLINE_S  = 24 * 3600;
+const USDC_BASE     = (process.env.NEXT_PUBLIC_USDC_ADDRESS ?? "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913") as `0x${string}`;
+// Treasury wallet receives the monthly USDC payment. Falls back to the legacy
+// worker address for local dev where the env var isn't set yet.
+const NOVA_TREASURY = (process.env.NEXT_PUBLIC_NOVA_TREASURY_ADDRESS
+                    ?? process.env.NEXT_PUBLIC_NOVA_WORKER_ADDRESS
+                    ?? "0x9e80b1aa9c7C2a8B875CC569D8E30cEfB364c9aD") as `0x${string}`;
+const USDC_MONTHLY  = BigInt(9_990_000); // $9.99 USDC (6 decimals)
 
 const ERC20_ABI = parseAbi([
-  "function approve(address spender, uint256 amount) external returns (bool)",
-]);
-
-const ESCROW_ABI = parseAbi([
-  "function lock(bytes32 taskId, address worker, uint256 amount, uint256 deadline) external",
+  "function transfer(address to, uint256 amount) external returns (bool)",
 ]);
 
 export default function NovaPage() {
@@ -42,7 +40,7 @@ export default function NovaPage() {
   const [payState,     setPayState]     = useState<PayState>("idle");
   const [cryptoState,  setCryptoState]  = useState<CryptoState>("idle");
   const [errorMsg,     setErrorMsg]     = useState<string | null>(null);
-  const [lockTxHash,   setLockTxHash]   = useState<`0x${string}` | undefined>();
+  const [payTxHash,    setPayTxHash]    = useState<`0x${string}` | undefined>();
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [referralValid, setReferralValid] = useState<boolean | null>(null);
   const [tier, setTier]                 = useState<Tier>(null);
@@ -104,40 +102,43 @@ export default function NovaPage() {
   }
 
   // ─── Contract writes ───────────────────────────────────────────────────
-  const { writeContractAsync: approveUsdc } = useWriteContract();
-  const { writeContractAsync: lockEscrow }  = useWriteContract();
+  // Single transfer for the monthly model: USDC.transfer(treasury, amount).
+  const { writeContractAsync: transferUsdc } = useWriteContract();
 
-  // Wait for lock tx confirmation
-  const { isSuccess: lockConfirmed } = useWaitForTransactionReceipt({ hash: lockTxHash });
+  // Wait for transfer tx confirmation
+  const { isSuccess: payConfirmed } = useWaitForTransactionReceipt({ hash: payTxHash });
 
-  // Redirect to dashboard after lock confirms
+  // Once the on-chain transfer confirms, ask the backend to verify + credit
+  // the subscription, then redirect to the dashboard.
   useEffect(() => {
-    if (lockConfirmed && lockTxHash && email) {
-      setCryptoState("done");
+    if (!payConfirmed || !payTxHash || !address) return;
+    setCryptoState("done");
 
-      // Apply referral if present (fire-and-forget)
+    // Apply referral if present (fire-and-forget — referral data still
+    // keyed by email in the legacy table; this whole subsystem migrates
+    // in a later PR).
+    if (email) {
       const storedRef = localStorage.getItem(REFERRAL_STORAGE_KEY);
       if (storedRef) {
         fetch(`${BACKEND}/api/nova/apply-referral`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, referralCode: storedRef }),
-        }).catch(() => {}); // best-effort
-        localStorage.removeItem(REFERRAL_STORAGE_KEY); // Clear after use
+        }).catch(() => {});
+        localStorage.removeItem(REFERRAL_STORAGE_KEY);
       }
-
-      // Notify backend, then redirect
-      fetch(`${BACKEND}/api/nova/verify-payment`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ walletAddress: address, email, txHash: lockTxHash }),
-      })
-        .catch(() => {}) // best-effort — the on-chain tx is the source of truth
-        .finally(() => {
-          window.location.href = `/nova/dashboard?email=${encodeURIComponent(email)}&tx=${lockTxHash}`;
-        });
     }
-  }, [lockConfirmed, lockTxHash, email, address]);
+
+    fetch(`${BACKEND}/api/nova/crypto-verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ walletAddress: address, txHash: payTxHash, email: email || undefined }),
+    })
+      .catch(() => {}) // best-effort — the on-chain tx is the source of truth
+      .finally(() => {
+        window.location.href = `/nova/dashboard?subscribed=1&tx=${payTxHash}`;
+      });
+  }, [payConfirmed, payTxHash, email, address]);
 
   // ─── Step 02 → 03: Validate email ──────────────────────────────────────
   const handleEmailSubmit = useCallback(() => {
@@ -173,11 +174,13 @@ export default function NovaPage() {
     }
   }, [address, email]);
 
-  // ─── Step 03b: Native USDC checkout (crypto) ──────────────────────────
+  // ─── Step 03b: Native USDC monthly payment (crypto) ────────────────────
+  // One tx: USDC.transfer(treasury, $9.99). The backend verifies the
+  // Transfer event and credits a month. No escrow, no allowance, no
+  // approve dance — the simplest honest path for a monthly model.
   const handleCryptoCheckout = useCallback(async () => {
     if (!address) return;
     setErrorMsg(null);
-    setCryptoState("idle");
 
     // Ensure we're on Base Mainnet
     if (chainId !== base.id) {
@@ -187,41 +190,19 @@ export default function NovaPage() {
     }
 
     try {
-      // Step A: Approve USDC
-      setCryptoState("approving");
-      const approveTx = await approveUsdc({
+      setCryptoState("locking");                  // re-used label: "Sending USDC…"
+      const tx = await transferUsdc({
         address: USDC_BASE,
         abi: ERC20_ABI,
-        functionName: "approve",
-        args: [TASK_ESCROW, LOCK_AMOUNT],
-        chain: base,
-        account: address,
-      });
-      // We don't strictly need to wait for approval receipt — lock will revert if not approved.
-      // But for UX clarity we do a brief pause:
-      await new Promise((r) => setTimeout(r, 2000));
-
-      // Step B: Generate taskId and call lock()
-      setCryptoState("locking");
-      const timestamp = BigInt(Math.floor(Date.now() / 1000));
-      const taskId = keccak256(
-        encodePacked(["address", "address", "uint256"], [address, NOVA_WORKER, timestamp])
-      );
-      const deadline = timestamp + BigInt(DEADLINE_S);
-
-      const lockTx = await lockEscrow({
-        address: TASK_ESCROW,
-        abi: ESCROW_ABI,
-        functionName: "lock",
-        args: [taskId, NOVA_WORKER, LOCK_AMOUNT, deadline],
+        functionName: "transfer",
+        args: [NOVA_TREASURY, USDC_MONTHLY],
         chain: base,
         account: address,
       });
 
-      // Step C: Wait for confirmation
       setCryptoState("confirming");
-      setLockTxHash(lockTx);
-      // useWaitForTransactionReceipt handles the rest → redirect in useEffect
+      setPayTxHash(tx);
+      // useWaitForTransactionReceipt handles the rest → /crypto-verify in useEffect
     } catch (err: unknown) {
       setCryptoState("error");
       const msg = (err as { shortMessage?: string })?.shortMessage
@@ -232,17 +213,13 @@ export default function NovaPage() {
         setErrorMsg(msg);
       }
     }
-  }, [address, chainId, switchChain, approveUsdc, lockEscrow]);
+  }, [address, chainId, switchChain, transferUsdc]);
 
   // ─── Derived state ────────────────────────────────────────────────────
   const displayPrice = tier === "regular" ? REGULAR_PRICE : FOUNDING_PRICE;
 
-  const stripeDisabled = payState === "loading" || payState === "redirecting" || payState === "sold_out";
-
-  // Crypto monthly path lands in PR 7; the legacy one-time flow doesn't
-  // satisfy the new subscription gate, so we disable it here rather than
-  // silently leaving users with locked USDC and no chat access.
-  const cryptoDisabled = true;
+  const stripeDisabled = payState === "loading" || payState === "redirecting" || payState === "sold_out" || cryptoState !== "idle";
+  const cryptoDisabled = cryptoState !== "idle" && cryptoState !== "error";
 
   const stripeLabel =
     payState === "loading"      ? "Preparing checkout…"
@@ -250,7 +227,11 @@ export default function NovaPage() {
     : payState === "sold_out"     ? "Sold Out"
     : `Subscribe — ${displayPrice}/mo`;
 
-  const cryptoLabel = "Pay with USDC — coming soon";
+  const cryptoLabel =
+    cryptoState === "locking"     ? "Sending USDC…"
+    : cryptoState === "confirming"  ? "Confirming on Base…"
+    : cryptoState === "done"        ? "✓ Payment confirmed"
+    : `Pay with USDC — ${displayPrice}`;
 
   return (
     <main style={s.page}>

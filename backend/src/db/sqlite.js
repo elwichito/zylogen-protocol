@@ -189,6 +189,23 @@ db.exec(`
     ON auth_sessions(wallet);
   CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires
     ON auth_sessions(expires_at);
+
+  -- ─── Crypto monthly payments ──────────────────────────────────────────────
+  -- One row per redeemed USDC transfer. UNIQUE on tx_hash means a tx can
+  -- never be used to extend two periods. subscription_id can be NULL only
+  -- transiently — the verify endpoint sets it inside the same transaction
+  -- that inserts the row.
+  CREATE TABLE IF NOT EXISTS crypto_payments (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    tx_hash         TEXT    NOT NULL UNIQUE,
+    wallet          TEXT    NOT NULL,
+    subscription_id INTEGER,
+    amount_units    TEXT    NOT NULL,
+    redeemed_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_crypto_payments_wallet
+    ON crypto_payments(wallet);
 `);
 
 // Column migrations for nova_sessions table - add referral columns
