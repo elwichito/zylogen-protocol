@@ -9,14 +9,16 @@
   dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 }
 
-const express   = require("express");
-const cors      = require("cors");
-const helmet    = require("helmet");
-const rateLimit = require("express-rate-limit");
+const express      = require("express");
+const cors         = require("cors");
+const helmet       = require("helmet");
+const rateLimit    = require("express-rate-limit");
+const cookieParser = require("cookie-parser");
 const { server: log, createRequestLogger } = require("./lib/logger");
 const webhookRouter   = require("./routes/webhook");
 const novaRouter      = require("./routes/nova");
 const internalRouter  = require("./routes/internal");
+const authRouter      = require("./routes/auth");
 const { getFullHealthStatus, getSimpleHealthStatus } = require("./services/healthCheck");
 
 const app  = express();
@@ -98,6 +100,7 @@ app.use(cors({
     if (!origin || allowedOrigins.has(origin)) return cb(null, true);
     cb(new Error(`CORS: origin not allowed — ${origin}`));
   },
+  credentials: true,                     // allow cookies on cross-origin requests
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "x-admin-key", "x-internal-key"],
   maxAge: 86400,   // browsers cache preflight for 24h
@@ -108,6 +111,10 @@ app.use("/webhooks", webhookRouter);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
+
+// Auth endpoints (public — no rate-limit override; covered by generalLimiter)
+app.use("/api/auth", authRouter);
 
 // Apply specific rate limits to Nova endpoints before the router
 app.post("/api/nova/message", messageLimiter);

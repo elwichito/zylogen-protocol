@@ -14,6 +14,13 @@ const { releasePayment }       = require("../services/paymentRelay");
 const { sendPaymentConfirmedEmail, sendKitDeliveredEmail } = require("../services/email");
 const { generateAndSaveKit, markKitDelivered } = require("../services/kitGenerator");
 const { getZylScoreResponse, invalidateTodayCache } = require("../services/zylScore");
+const {
+  foundingSlotsRemaining,
+  getActiveSubscription,
+  hasActiveAccess,
+} = require("../services/subscriptions");
+const { verifyAndCredit: verifyCryptoPayment } = require("../services/cryptoPayments");
+const { requireWallet } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -33,12 +40,10 @@ function getStripe() {
 }
 
 // ─── GET /api/nova/scarcity — public ─────────────────────────────────────────
+// Counts founding subscription slots remaining (1 of 100 cap).
 
 router.get("/scarcity", (_req, res) => {
-  const row = db.prepare(`SELECT claimed FROM scarcity WHERE id = 1`).get();
-  const claimed   = row?.claimed ?? 0;
-  const remaining = Math.max(0, FOUNDING_100_CAP - claimed);
-  res.json({ remaining, claimed, cap: FOUNDING_100_CAP });
+  res.json(foundingSlotsRemaining());
 });
 
 // ─── GET /api/zyl-score — public ZYL Score endpoint ─────────────────────────
@@ -88,81 +93,188 @@ router.get("/stats", (_req, res) => {
   }
 });
 
-// ─── POST /api/nova/checkout — create Stripe session ─────────────────────────
-// client_reference_id = the user's MetaMask address (provided by frontend)
+// ─── POST /api/nova/subscribe — Stripe Checkout (subscription mode) ─────────
+// Open endpoint (no auth) — the wallet is the only link between this
+// unauthenticated payment and the authenticated session created afterward.
+// The dashboard cookie-signs the same wallet to unlock chat.
 
-router.post("/checkout", async (req, res) => {
-  const { walletAddress, email } = req.body;
+router.post("/subscribe", async (req, res) => {
+  const { walletAddress, email } = req.body ?? {};
 
   if (!walletAddress || !/^0x[0-9a-fA-F]{40}$/.test(walletAddress)) {
     return res.status(400).json({ error: "valid walletAddress required" });
   }
 
-  const { claimed } = db.prepare(`SELECT claimed FROM scarcity WHERE id = 1`).get();
-  if (claimed >= FOUNDING_100_CAP) {
-    return res.status(410).json({ error: "sold_out" });
+  const slots = foundingSlotsRemaining();
+  const useFounding = slots.remaining > 0;
+  const priceId = useFounding
+    ? process.env.STRIPE_PRICE_FOUNDING
+    : process.env.STRIPE_PRICE_REGULAR;
+
+  if (!priceId) {
+    log.error({ useFounding }, "Stripe price id not configured");
+    return res.status(500).json({ error: "billing_misconfigured" });
   }
 
-  log.info({ wallet: walletAddress, email: email || null }, "Checkout initiated");
+  log.info({ wallet: walletAddress, email: email || null, useFounding }, "Subscribe initiated");
 
   try {
     const session = await getStripe().checkout.sessions.create({
+      mode: "subscription",
       payment_method_types: ["card"],
-      mode: "payment",
       customer_email: email || undefined,
-      client_reference_id: walletAddress,   // → paymentRelay uses this for lock()
-      line_items: [{
-        price_data: {
-          currency: "usd",
-          unit_amount: FOUNDING_100_CENTS,
-          product_data: {
-            name: "Nova — Founding 100 Branding Kit",
-            description: "One-time premium Instagram branding kit by Nova AI.",
-          },
-        },
-        quantity: 1,
-      }],
-      // email param lets the dashboard poll /api/nova/status immediately on landing.
-      success_url: `${process.env.FRONTEND_URL}/nova/dashboard?email=${encodeURIComponent(email || "")}`,
+      client_reference_id: walletAddress,
+      line_items: [{ price: priceId, quantity: 1 }],
+      // Propagate the tier to the resulting Subscription so the webhook can
+      // decide whether to claim a founding slot.
+      subscription_data: {
+        metadata: { tier: useFounding ? "founding" : "regular", wallet: walletAddress },
+      },
+      allow_promotion_codes: true,
+      success_url: `${process.env.FRONTEND_URL}/nova/dashboard?subscribed=1`,
       cancel_url:  `${process.env.FRONTEND_URL}/nova?payment=cancelled`,
     });
 
-    log.info({ sessionId: session.id, wallet: walletAddress }, "Stripe session created");
-    res.json({ checkoutUrl: session.url });
+    log.info({ sessionId: session.id, wallet: walletAddress }, "Stripe subscription session created");
+    res.json({ checkoutUrl: session.url, tier: useFounding ? "founding" : "regular" });
   } catch (err) {
-    log.error({ err, wallet: walletAddress }, "Checkout session creation failed");
-    res.status(500).json({ error: "Could not create checkout session" });
+    log.error({ err, wallet: walletAddress }, "Subscribe session creation failed");
+    res.status(500).json({ error: "Could not create subscription session" });
   }
 });
 
-// ─── POST /api/nova/message — Nova chat ──────────────────────────────────────
-// Gate: email must have a locked escrow record
+// ─── POST /api/nova/crypto-verify ───────────────────────────────────────────
+// Open endpoint. Body: { walletAddress, txHash, email? }.
+// Verifies the on-chain USDC transfer to the treasury, then either
+// creates a new subscription (claiming a founding slot if one exists) or
+// extends the wallet's existing subscription by 30 days. Idempotent via
+// UNIQUE(tx_hash). Handles both first-time subscribe and monthly renew —
+// the only branching is "does this wallet already have a subscription?".
 
-router.post("/message", async (req, res) => {
-  const { email, message, history } = req.body;
+router.post("/crypto-verify", async (req, res) => {
+  const { walletAddress, txHash, email } = req.body ?? {};
 
-  if (!email || !message) {
-    return res.status(400).json({ error: "email and message required" });
+  if (!walletAddress || !/^0x[0-9a-fA-F]{40}$/.test(walletAddress)) {
+    return res.status(400).json({ error: "valid walletAddress required" });
   }
-
-  // Simple payment gate — check SQLite for a locked or released record.
-  // `released` is included so a user with a settled escrow can still chat.
-  const paid = db.prepare(
-    `SELECT id FROM escrow_records WHERE client_email = ? AND status IN ('locked','released') LIMIT 1`
-  ).get(email);
-
-  if (!paid) {
-    return res.status(402).json({ error: "payment_required" });
+  if (!txHash || !/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
+    return res.status(400).json({ error: "valid txHash required" });
   }
 
   try {
-    // Simplified Nova: stateless consultant chat. No briefing flow, no kit
-    // generation. The chat itself is the deliverable. The client passes
-    // recent conversation history so Claude has context.
-    const reply = await chatWithNova(email, message.trim(), history);
+    const result = await verifyCryptoPayment({ walletInput: walletAddress, txHash, email: email || null });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    // Map known verification failures to 4xx; everything else is 500.
+    const known = ["tx_not_found", "tx_reverted", "no_matching_transfer", "tx_already_redeemed"];
+    if (known.includes(err.code)) {
+      log.info({ wallet: walletAddress, txHash, code: err.code }, "Crypto verify rejected");
+      return res.status(400).json({ error: err.code });
+    }
+    log.error({ err, wallet: walletAddress, txHash }, "Crypto verify failed");
+    res.status(500).json({ error: "Could not verify on-chain payment" });
+  }
+});
+
+// ─── POST /api/nova/billing-portal ──────────────────────────────────────────
+// Returns a Stripe Customer Portal URL so the user can cancel, update
+// card, view invoices — Stripe handles the UI, we don't.
+
+router.post("/billing-portal", requireWallet, async (req, res) => {
+  const sub = getActiveSubscription(req.wallet);
+  if (!sub?.stripe_customer_id) {
+    return res.status(404).json({ error: "no_subscription" });
+  }
+  try {
+    const portal = await getStripe().billingPortal.sessions.create({
+      customer: sub.stripe_customer_id,
+      return_url: `${process.env.FRONTEND_URL}/nova/dashboard`,
+    });
+    res.json({ url: portal.url });
+  } catch (err) {
+    log.error({ err, wallet: req.wallet }, "Billing portal creation failed");
+    res.status(500).json({ error: "Could not open billing portal" });
+  }
+});
+
+// ─── GET /api/nova/subscription/status ──────────────────────────────────────
+// Returns the wallet's current subscription state. Authed.
+
+router.get("/subscription/status", requireWallet, (req, res) => {
+  const sub = getActiveSubscription(req.wallet);
+  if (!sub) return res.json({ active: false, foundingMember: false });
+
+  res.json({
+    active: hasActiveAccess(req.wallet),
+    status: sub.status,
+    foundingMember: !!sub.founding_member,
+    source: sub.source,
+    currentPeriodEnd: sub.current_period_end,
+    canceledAt: sub.canceled_at,
+  });
+});
+
+// ─── GET /api/nova/history ──────────────────────────────────────────────────
+// Returns the wallet's chat history (oldest first), capped to last 200 turns.
+
+router.get("/history", requireWallet, (req, res) => {
+  const rows = db.prepare(
+    `SELECT role, text, created_at
+       FROM nova_messages
+      WHERE wallet = ?
+      ORDER BY created_at DESC
+      LIMIT 200`
+  ).all(req.wallet).reverse();
+  res.json({ messages: rows });
+});
+
+// ─── POST /api/nova/message ─────────────────────────────────────────────────
+// Authed. Gated by active subscription. Persists both turns to nova_messages.
+
+router.post("/message", requireWallet, async (req, res) => {
+  const { message } = req.body ?? {};
+
+  if (typeof message !== "string" || message.trim().length === 0) {
+    return res.status(400).json({ error: "message required" });
+  }
+  if (message.length > 4000) {
+    return res.status(400).json({ error: "message too long (max 4000 chars)" });
+  }
+
+  if (!hasActiveAccess(req.wallet)) {
+    return res.status(402).json({ error: "subscription_required" });
+  }
+
+  // Load recent history from DB (last 20 turns) so the LLM has context.
+  // Map our schema to the {role: 'user'|'assistant', content} shape chatWithNova expects.
+  const recent = db.prepare(
+    `SELECT role, text FROM nova_messages
+      WHERE wallet = ?
+      ORDER BY created_at DESC
+      LIMIT 20`
+  ).all(req.wallet).reverse();
+
+  const history = recent.map((r) => ({
+    role:    r.role === "nova" ? "assistant" : "user",
+    content: r.text,
+  }));
+
+  const userText = message.trim();
+
+  // Persist user turn before calling Claude, so a crash mid-call doesn't
+  // lose their input.
+  db.prepare(
+    `INSERT INTO nova_messages (wallet, role, text) VALUES (?, 'user', ?)`
+  ).run(req.wallet, userText);
+
+  try {
+    const reply = await chatWithNova(req.wallet, userText, history);
+    db.prepare(
+      `INSERT INTO nova_messages (wallet, role, text) VALUES (?, 'nova', ?)`
+    ).run(req.wallet, reply);
     res.json({ reply });
   } catch (err) {
-    log.error({ err, email }, "Nova message processing failed");
+    log.error({ err, wallet: req.wallet }, "Nova message processing failed");
     res.status(500).json({ error: "Nova encountered an error." });
   }
 });
